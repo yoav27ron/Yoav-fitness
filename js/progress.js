@@ -1,5 +1,5 @@
 // ====== PROGRESS + DASHBOARD + ACHIEVEMENTS + EVENTS ======
-import { saveData, loadData, getDayKey, getWeekKeys, getMonthKeys, DAY_NAMES, MONTH_NAMES, showToast } from './storage.js';
+import { getDayKey, DAY_NAMES, MONTH_NAMES, showToast } from './store.js';
 
 // ── STATE ──
 let weights = [];
@@ -57,12 +57,24 @@ function checkWorkoutStreak(log, sport, n) {
 
 // ── INIT ──
 export async function initProgress() {
-  weights = await loadData('weights', []);
-  workoutLog = await loadData('workoutLog', {});
-  foodLog = await loadData('foodLog', {});
-  waterLog = await loadData('waterLog', {});
-  currentEventMode = await loadData('eventMode', 'normal');
-  achievements = await loadData('achievements', []);
+  const { get: sg, subscribe, getDayStats, getWeekStats } = await import('./store.js');
+  const refresh = () => {
+    weights      = sg('weights')     || [];
+    workoutLog   = sg('workoutLog')  || {};
+    foodLog      = sg('foodLog')     || {};
+    currentEventMode = sg('eventMode') || 'normal';
+    achievements = sg('achievements')|| [];
+    waterLog = {};
+    const daily  = sg('daily') || {};
+    Object.entries(daily).forEach(([date, d]) => { if (d.water) waterLog[date] = d.water; });
+  };
+  refresh();
+  subscribe('*', (key) => {
+    if (['weights','workoutLog','foodLog','daily','eventMode'].includes(key)) {
+      refresh();
+      if (document.getElementById('dashboard')?.classList.contains('active')) renderDashboard();
+    }
+  });
   checkAchievements();
   renderDashboard();
   renderCalendar();
@@ -181,20 +193,33 @@ function renderCalendar(year, month) {
   const el = document.getElementById('calendarContent');
   if (!el) return;
   const now = new Date();
-  const y = year ?? now.getFullYear();
-  const m = month ?? now.getMonth();
-  const firstDay = new Date(y, m, 1).getDay();
+  const y   = year  ?? now.getFullYear();
+  const m   = month ?? now.getMonth();
+  const firstDay    = new Date(y, m, 1).getDay();
   const daysInMonth = new Date(y, m+1, 0).getDate();
-  const todayStr = getDayKey(0);
+  const todayStr    = getDayKey(0);
+  const daily       = window.store?.get('daily') || {};
 
   const cells = [];
-  for (let i = 0; i < firstDay; i++) cells.push(null);
-  for (let d = 1; d <= daysInMonth; d++) {
+  for (let i=0; i<firstDay; i++) cells.push(null);
+  for (let d=1; d<=daysInMonth; d++) {
     const dateStr = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    const hasW = (workoutLog[dateStr]||[]).length > 0;
-    const hasF = (foodLog[dateStr]||[]).length > 0;
-    const waterOk = (waterLog[dateStr]||0) >= 8;
-    cells.push({ d, dateStr, hasW, hasF, waterOk, isToday: dateStr === todayStr });
+    const dayData = daily[dateStr] || {};
+    const checks  = dayData.checks || {};
+    const done    = Object.values(checks).filter(v=>v==='done').length;
+    const total   = 10;
+    const score   = Math.round((done/total)*100);
+    const hasW    = (workoutLog[dateStr]||[]).length > 0;
+    const meals   = (foodLog[dateStr]||[]).length;
+    const water   = dayData.water || 0;
+    const waterOk = water >= 8;
+    const hasSomeActivity = done > 0 || hasW || meals > 0;
+    // Color based on score
+    const bgColor = !hasSomeActivity ? 'transparent'
+      : score >= 70 ? 'rgba(52,211,153,0.15)'
+      : score >= 40 ? 'rgba(245,166,35,0.12)'
+      : 'rgba(248,113,113,0.08)';
+    cells.push({ d, dateStr, hasW, meals, water, waterOk, done, score, isToday: dateStr===todayStr, bgColor });
   }
 
   el.innerHTML = `
@@ -203,27 +228,62 @@ function renderCalendar(year, month) {
       <div style="font-weight:700;font-size:16px;">${MONTH_NAMES[m]} ${y}</div>
       <button onclick="window.progress.navCal(${y},${m},1)" class="btn btn-ghost" style="padding:6px 12px;font-size:14px;">▶</button>
     </div>
-    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:8px;">
-      ${DAY_NAMES.map(d=>`<div style="text-align:center;font-size:10px;color:var(--muted2);padding:4px 0;">${d.substring(0,1)}</div>`).join('')}
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:6px;">
+      ${DAY_NAMES.map(d=>`<div style="text-align:center;font-size:9px;color:var(--muted2);padding:3px 0;">${d.substring(0,1)}</div>`).join('')}
     </div>
     <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:14px;">
-      ${cells.map(cell => cell ? `
-        <div style="aspect-ratio:1;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:1px solid ${cell.isToday?'var(--gold)':'transparent'};background:${cell.hasW&&cell.hasF?'rgba(52,211,153,0.1)':cell.hasW?'rgba(245,166,35,0.1)':cell.hasF?'rgba(96,165,250,0.08)':'transparent'};cursor:pointer;"
-          onclick="window.progress.showDayDetail('${cell.dateStr}')">
-          <div style="font-size:11px;font-weight:${cell.isToday?'700':'400'};color:${cell.isToday?'var(--gold)':'var(--text)'};">${cell.d}</div>
-          <div style="display:flex;gap:2px;">
-            ${cell.hasW?'<div style="width:4px;height:4px;border-radius:50%;background:var(--gold);"></div>':''}
-            ${cell.hasF?'<div style="width:4px;height:4px;border-radius:50%;background:var(--green);"></div>':''}
-            ${cell.waterOk?'<div style="width:4px;height:4px;border-radius:50%;background:var(--blue);"></div>':''}
+      ${cells.map(cell => !cell ? '<div></div>' : `
+        <div onclick="window.progress.showDayDetail('${cell.dateStr}')"
+          style="aspect-ratio:1;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;border:1.5px solid ${cell.isToday?'var(--gold)':'transparent'};background:${cell.bgColor};cursor:pointer;padding:2px;">
+          <div style="font-size:11px;font-weight:${cell.isToday?'700':'400'};color:${cell.isToday?'var(--gold)':cell.score>=70&&cell.done>0?'var(--green)':'var(--text)'};">${cell.d}</div>
+          ${cell.done>0 ? `<div style="font-size:9px;font-weight:700;color:${cell.score>=70?'var(--green)':cell.score>=40?'var(--gold)':'var(--red)'};">${cell.score}%</div>` : ''}
+          <div style="display:flex;gap:1px;margin-top:1px;">
+            ${cell.hasW   ? '<div style="width:3px;height:3px;border-radius:50%;background:var(--gold);"></div>' :''}
+            ${cell.meals>0? '<div style="width:3px;height:3px;border-radius:50%;background:var(--green);"></div>':''}
+            ${cell.waterOk? '<div style="width:3px;height:3px;border-radius:50%;background:var(--blue);"></div>' :''}
           </div>
-        </div>` : '<div></div>').join('')}
+        </div>`).join('')}
     </div>
+
+    <!-- Stats summary -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;">
+      ${_monthStats(y, m, daily)}
+    </div>
+
     <!-- Legend -->
-    <div style="display:flex;gap:14px;flex-wrap:wrap;">
-      <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted2);"><div style="width:8px;height:8px;border-radius:50%;background:var(--gold);"></div>אימון</div>
-      <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted2);"><div style="width:8px;height:8px;border-radius:50%;background:var(--green);"></div>ארוחה</div>
-      <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted2);"><div style="width:8px;height:8px;border-radius:50%;background:var(--blue);"></div>מים ✓</div>
-    </div>`;
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
+      <div style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--muted2);"><div style="width:10px;height:10px;border-radius:3px;background:rgba(52,211,153,0.2);"></div>70%+ מצוין</div>
+      <div style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--muted2);"><div style="width:10px;height:10px;border-radius:3px;background:rgba(245,166,35,0.15);"></div>40-70% טוב</div>
+      <div style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--muted2);"><div style="width:10px;height:10px;border-radius:3px;background:rgba(248,113,113,0.1);"></div>מתחת 40%</div>
+    </div>
+
+    <!-- Day detail panel -->
+    <div id="dayDetailPanel"></div>
+  `;
+}
+
+function _monthStats(y, m, daily) {
+  let activeDays=0, totalScore=0, workoutDays=0;
+  const daysInMonth = new Date(y, m+1, 0).getDate();
+  for (let d=1; d<=daysInMonth; d++) {
+    const dateStr = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const dayData = daily[dateStr] || {};
+    const checks  = dayData.checks || {};
+    const done    = Object.values(checks).filter(v=>v==='done').length;
+    if (done > 0) { activeDays++; totalScore += Math.round((done/10)*100); }
+    if ((workoutLog[dateStr]||[]).length > 0) workoutDays++;
+  }
+  const avgScore = activeDays > 0 ? Math.round(totalScore/activeDays) : 0;
+  return [
+    ['📅', 'ימים פעילים', activeDays],
+    ['💪', 'אימונים', workoutDays],
+    ['⭐', 'ציון ממוצע', avgScore+'%'],
+  ].map(([icon, label, val]) => `
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center;">
+      <div style="font-size:18px;">${icon}</div>
+      <div style="font-size:18px;font-weight:800;color:var(--gold);">${val}</div>
+      <div style="font-size:10px;color:var(--muted2);">${label}</div>
+    </div>`).join('');
 }
 
 export function navCal(y, m, dir) {
@@ -234,13 +294,81 @@ export function navCal(y, m, dir) {
 }
 
 export function showDayDetail(dateStr) {
-  const d = new Date(dateStr);
-  const label = `${DAY_NAMES[d.getDay()]} ${d.getDate()} ${MONTH_NAMES[d.getMonth()]}`;
-  const workouts = workoutLog[dateStr] || [];
-  const meals = foodLog[dateStr] || [];
-  const water = waterLog[dateStr] || 0;
+  const panel = document.getElementById('dayDetailPanel');
+  if (!panel) return;
+  const d       = new Date(dateStr);
+  const label   = `${DAY_NAMES[d.getDay()]} ${d.getDate()} ${MONTH_NAMES[d.getMonth()]}`;
+  const sessions= workoutLog[dateStr] || [];
+  const meals   = foodLog[dateStr]    || [];
+  const daily   = window.store?.get('daily') || {};
+  const dayData = daily[dateStr]      || {};
+  const water   = dayData.water       || 0;
+  const checks  = dayData.checks      || {};
+  const done    = Object.values(checks).filter(v=>v==='done').length;
+  const totCal  = meals.reduce((a,m)=>a+(m.cal||0),0);
 
-  showToast(`📅 ${label}: ${workouts.length} אימונים · ${meals.length} ארוחות · ${water} כוסות`);
+  const TASK_NAMES = {
+    morning_water:'💧 מים בקימה', meal1:'🍳 ארוחת בוקר', water_mid:'💧 מים בוקר',
+    snack:'🍌 חטיף', workout:'💪 אימון', meal2:'🥩 ארוחת צהריים',
+    water_aft:'💧 מים אחה"צ', meal3:'🍽️ ארוחת ערב', snack_eve:'🍎 חטיף ערב', water_night:'💧 מים לפני שינה'
+  };
+
+  panel.innerHTML = `
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;">
+      <div style="padding:13px 16px;background:rgba(255,255,255,0.03);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+        <div style="font-weight:700;font-size:15px;">${label}</div>
+        <button onclick="document.getElementById('dayDetailPanel').innerHTML=''" style="background:none;border:none;color:var(--muted2);font-size:14px;cursor:pointer;">✕</button>
+      </div>
+      <div style="padding:13px 16px;">
+        <!-- Stats row -->
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
+          <div style="background:rgba(245,166,35,0.08);border:1px solid rgba(245,166,35,0.2);border-radius:9px;padding:7px 12px;text-align:center;flex:1;min-width:70px;">
+            <div style="font-size:16px;font-weight:800;color:var(--gold);">${Math.round((done/10)*100)}%</div>
+            <div style="font-size:10px;color:var(--muted2);">ציון יומי</div>
+          </div>
+          <div style="background:rgba(52,211,153,0.08);border:1px solid rgba(52,211,153,0.2);border-radius:9px;padding:7px 12px;text-align:center;flex:1;min-width:70px;">
+            <div style="font-size:16px;font-weight:800;color:var(--green);">${totCal}</div>
+            <div style="font-size:10px;color:var(--muted2);">קל׳</div>
+          </div>
+          <div style="background:rgba(96,165,250,0.08);border:1px solid rgba(96,165,250,0.2);border-radius:9px;padding:7px 12px;text-align:center;flex:1;min-width:70px;">
+            <div style="font-size:16px;font-weight:800;color:var(--blue);">${water}</div>
+            <div style="font-size:10px;color:var(--muted2);">כוסות</div>
+          </div>
+        </div>
+
+        <!-- Tasks -->
+        ${done > 0 ? `
+        <div style="margin-bottom:12px;">
+          <div style="font-size:12px;font-weight:700;color:var(--muted2);margin-bottom:6px;">משימות (${done}/10)</div>
+          <div style="display:flex;flex-direction:column;gap:4px;">
+            ${Object.entries(checks).map(([id,status]) => `
+              <div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:rgba(255,255,255,0.03);border-radius:7px;">
+                <span style="font-size:14px;">${status==='done'?'✅':status==='skipped'?'❌':'⏰'}</span>
+                <span style="font-size:12px;color:var(--muted2);">${TASK_NAMES[id]||id}</span>
+              </div>`).join('')}
+          </div>
+        </div>` : ''}
+
+        <!-- Workouts -->
+        ${sessions.length > 0 ? `
+        <div style="margin-bottom:10px;">
+          <div style="font-size:12px;font-weight:700;color:var(--muted2);margin-bottom:5px;">אימונים</div>
+          ${sessions.map(s=>`<div style="font-size:13px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.04);">💪 ${s.name||'אימון'} · ${s.duration||0} דק׳ · ${s.calories||0} קל׳</div>`).join('')}
+        </div>` : ''}
+
+        <!-- Meals -->
+        ${meals.length > 0 ? `
+        <div>
+          <div style="font-size:12px;font-weight:700;color:var(--muted2);margin-bottom:5px;">ארוחות</div>
+          ${meals.map(m=>`<div style="font-size:13px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.04);">🍽️ ${m.name} · ${m.cal} קל׳</div>`).join('')}
+        </div>` : ''}
+
+        ${done===0&&sessions.length===0&&meals.length===0 ? '<div style="font-size:13px;color:var(--muted2);text-align:center;padding:8px;">אין נתונים ליום זה</div>' : ''}
+      </div>
+    </div>`;
+
+  // Scroll to panel
+  setTimeout(() => panel.scrollIntoView({behavior:'smooth', block:'nearest'}), 100);
 }
 
 // ── WEIGHT PROGRESS ──
@@ -381,7 +509,8 @@ function renderEventModes() {
 
 export async function setEventMode(id) {
   currentEventMode = id;
-  await saveData('eventMode', id);
+  const { set } = await import('./store.js');
+  await set('eventMode', id);
   renderEventModes();
   renderDashboard();
   showToast(`✅ מצב: ${EVENT_MODES.find(m=>m.id===id)?.title}`);

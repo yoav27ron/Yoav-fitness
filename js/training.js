@@ -1,5 +1,5 @@
 // ====== TRAINING MODULE ======
-import { saveData, loadData, DAY_NAMES, getDayKey, formatTime, showToast } from './storage.js';
+import { DAY_NAMES, getDayKey, formatTime, showToast } from './store.js';
 
 // ── SPORT TYPES ──
 export const SPORT_TYPES = [
@@ -73,8 +73,12 @@ let editingId = null;
 let liveSession = null; // { workoutId, startTime, sets: [], timerInterval }
 
 export async function initTraining() {
-  workouts = await loadData('workouts', DEFAULT_WORKOUTS);
-  workoutLog = await loadData('workoutLog', {});
+  const { get: sg, subscribe } = await import('./store.js');
+  workouts   = sg('workouts')    || DEFAULT_WORKOUTS;
+  workoutLog = sg('workoutLog')  || {};
+  if (!workouts || workouts.length === 0) workouts = DEFAULT_WORKOUTS;
+  subscribe('workoutLog', (log) => { workoutLog = log || {}; if(document.getElementById('training')?.classList.contains('active')) renderTrainingSection(); });
+  subscribe('workouts',   (ws)  => { workouts   = ws  || DEFAULT_WORKOUTS; });
   renderTrainingSection();
 }
 
@@ -128,7 +132,7 @@ function renderWorkoutCard(w) {
           <div class="card-icon">${sp.icon}</div>
           <div>
             <div class="card-title">${w.name}</div>
-            <div class="card-meta">${w.days.map(d=>DAY_NAMES[d]).join(' + ')} | ${w.duration} דקות | ${sp.cat}</div>
+            <div class="card-meta">${w.days.length===7?'כל יום':w.days.map(d=>DAY_NAMES[d]).join(' + ')} | ${w.duration} דקות</div>
           </div>
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;">
@@ -145,7 +149,7 @@ function renderWorkoutCard(w) {
             <div style="flex:1;">
               <div style="font-size:13px;font-weight:600;">${ex.name}</div>
               ${ex.note?`<div style="font-size:11px;color:var(--muted2);">${ex.note}</div>`:''}
-              ${ex.yt?`<a href="${ex.yt}" target="_blank" style="display:inline-flex;align-items:center;gap:3px;font-size:10px;color:var(--red);background:rgba(248,113,113,0.1);border-radius:4px;padding:2px 6px;margin-top:3px;text-decoration:none;border:1px solid rgba(248,113,113,0.2);">▶ יוטיוב</a>`:''}
+              ${ex.yt?`<a href="${ex.yt}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="display:inline-flex;align-items:center;gap:3px;font-size:11px;color:var(--red);background:rgba(248,113,113,0.1);border-radius:6px;padding:4px 9px;margin-top:4px;text-decoration:none;border:1px solid rgba(248,113,113,0.2);font-weight:600;">▶ פתח ביוטיוב</a>`:''}
             </div>
             <div style="font-size:13px;font-weight:700;color:var(--gold);flex-shrink:0;">${ex.sets}×${ex.reps}</div>
           </div>`).join('')}
@@ -155,24 +159,24 @@ function renderWorkoutCard(w) {
 }
 
 function renderWorkoutHistory() {
-  const last7 = Array.from({length:7},(_,i)=>getDayKey(-i));
+  const last14 = Array.from({length:14},(_,i)=>getDayKey(-i));
   const entries = [];
-  last7.forEach(key => {
+  last14.forEach(key => {
     (workoutLog[key]||[]).forEach(l => entries.push({...l, date:key}));
   });
-  if (entries.length === 0) return '<div style="font-size:13px;color:var(--muted2);">עדיין לא תיעדת אימונים.</div>';
-  return entries.map(e => {
-    const w = workouts.find(x => x.id === e.workoutId);
+  if (entries.length === 0) return '<div style="font-size:13px;color:var(--muted2);padding:12px 0;">עדיין לא תיעדת אימונים — לחץ "התחל" על אימון!</div>';
+  return entries.slice(0,10).map(e => {
     const sp = SPORT_TYPES.find(s => s.id === e.sportType);
     const d = new Date(e.date);
+    const dateLabel = d.getDate()+"/"+(d.getMonth()+1);
     return `
-      <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px 16px;margin-bottom:8px;display:flex;align-items:center;gap:12px;">
-        <div style="font-size:24px;">${sp?.icon||'💪'}</div>
-        <div style="flex:1;">
-          <div style="font-weight:600;font-size:14px;">${e.name||w?.name||'אימון'}</div>
-          <div style="font-size:11px;color:var(--muted2);">${d.getDate()}/${d.getMonth()+1} · ${e.duration}′ · ${e.calories||0} קל׳</div>
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:11px 14px;margin-bottom:7px;display:flex;align-items:center;gap:10px;">
+        <div style="font-size:22px;flex-shrink:0;">${sp?.icon||'💪'}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${e.name||'אימון'}</div>
+          <div style="font-size:11px;color:var(--muted2);">${dateLabel} · ${e.duration||0} דקות · ${e.calories||0} קל׳</div>
         </div>
-        ${e.distance?`<div style="font-size:14px;font-weight:700;color:var(--blue);">${e.distance}km</div>`:''}
+        ${e.distance?`<div style="font-size:13px;font-weight:700;color:var(--blue);flex-shrink:0;">${e.distance}km</div>`:''}
       </div>`;
   }).join('');
 }
@@ -325,7 +329,10 @@ export async function endWorkout() {
     feeling: liveSession.feeling ?? 2,
     timestamp: Date.now()
   });
-  await saveData('workoutLog', workoutLog);
+  const { addWorkoutSession, get: sg2 } = await import('./store.js');
+  const sess = workoutLog[key]?.pop();
+  if (sess) await addWorkoutSession(key, sess);
+  workoutLog = sg2('workoutLog') || workoutLog;
   document.getElementById('liveWorkoutModal').style.display = 'none';
   document.body.style.overflow = '';
   liveSession = null;
@@ -408,17 +415,21 @@ export function openWorkoutEditor(id) {
 }
 
 function exRowHTML(ex) {
-  return `<div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px;">
-    <div style="display:flex;gap:8px;margin-bottom:8px;">
-      <input type="text" data-field="name" placeholder="שם התרגיל" value="${ex?.name||''}" class="input" style="flex:1;"/>
-      <button onclick="this.closest('div[style]').remove()" class="btn btn-danger" style="padding:6px 10px;font-size:12px;">✕</button>
+  return `<div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:8px;">
+    <div style="display:flex;gap:6px;margin-bottom:6px;align-items:center;">
+      <span style="font-size:12px;color:var(--muted2);flex-shrink:0;">🏋️</span>
+      <input type="text" data-field="name" placeholder="שם התרגיל" value="${ex?.name||''}" class="input" style="flex:1;padding:8px 10px;"/>
+      <button onclick="this.closest('div').remove()" style="background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.2);color:var(--red);border-radius:7px;padding:6px 10px;font-size:13px;cursor:pointer;flex-shrink:0;">✕</button>
     </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;">
-      <div style="display:flex;align-items:center;gap:5px;"><span style="font-size:12px;color:var(--muted2);">סטים:</span><input type="number" data-field="sets" value="${ex?.sets||3}" min="1" max="10" class="input" style="width:55px;text-align:center;padding:6px 8px;"/></div>
-      <div style="display:flex;align-items:center;gap:5px;"><span style="font-size:12px;color:var(--muted2);">חזרות:</span><input type="text" data-field="reps" value="${ex?.reps||10}" placeholder="10 / 30&quot;" class="input" style="width:70px;text-align:center;padding:6px 8px;"/></div>
-      <div style="flex:1;min-width:120px;display:flex;align-items:center;gap:5px;"><span style="font-size:12px;color:var(--muted2);">הערה:</span><input type="text" data-field="note" value="${ex?.note||''}" class="input" style="flex:1;padding:6px 8px;"/></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 2fr;gap:6px;">
+      <div><span style="font-size:10px;color:var(--muted2);">סטים</span><input type="number" data-field="sets" value="${ex?.sets||3}" min="1" max="10" class="input" style="text-align:center;padding:6px;"/></div>
+      <div><span style="font-size:10px;color:var(--muted2);">חזרות</span><input type="text" data-field="reps" value="${ex?.reps||10}" class="input" style="text-align:center;padding:6px;"/></div>
+      <div><span style="font-size:10px;color:var(--muted2);">הערה</span><input type="text" data-field="note" value="${ex?.note||''}" placeholder="טיפ קצר" class="input" style="padding:6px 8px;"/></div>
     </div>
-    <div style="margin-top:8px;display:flex;align-items:center;gap:5px;"><span style="font-size:12px;color:var(--muted2);">יוטיוב:</span><input type="url" data-field="yt" value="${ex?.yt||''}" placeholder="https://youtube.com/..." class="input" style="flex:1;font-size:12px;padding:6px 8px;"/></div>
+    <div style="margin-top:6px;display:flex;align-items:center;gap:6px;">
+      <span style="font-size:18px;">▶</span>
+      <input type="url" data-field="yt" value="${ex?.yt||''}" placeholder="קישור יוטיוב (אופציונלי)" class="input" style="flex:1;font-size:12px;padding:6px 8px;color:var(--muted2);"/>
+    </div>
   </div>`;
 }
 
@@ -452,7 +463,8 @@ export async function saveWorkout() {
     exercises
   };
   workouts = editingId ? workouts.map(w=>w.id===editingId?workout:w) : [...workouts, workout];
-  await saveData('workouts', workouts);
+  const { set } = await import('./store.js');
+  await set('workouts', workouts);
   closeEditor();
   renderTrainingSection();
   showToast('✅ אימון נשמר!');
