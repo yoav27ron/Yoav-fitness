@@ -204,3 +204,128 @@ body{background:var(--bg);color:var(--text);font-family:'Heebo',sans-serif;min-h
   .modal-body{padding:14px 16px;}
   .live-timer{font-size:48px;}
 }
+
+/* ── BOTTOM NAV ── */
+.bottom-nav {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 300;
+  background: rgba(8,12,18,0.97);
+  backdrop-filter: blur(20px);
+  border-top: 1px solid var(--border);
+  display: flex; align-items: center;
+  height: 64px;
+  padding: 0 8px;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.bnav-btn {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 3px;
+  background: transparent; border: none; cursor: pointer;
+  padding: 8px 4px; border-radius: 12px;
+  transition: all 0.2s; color: var(--muted2);
+}
+.bnav-btn.active { color: var(--gold); }
+.bnav-btn:hover { background: rgba(255,255,255,0.05); }
+.bnav-icon { font-size: 22px; line-height: 1; }
+.bnav-label { font-size: 10px; font-weight: 600; font-family: 'Heebo', sans-serif; }
+.bnav-fab-space { width: 64px; flex-shrink: 0; }
+
+/* ── FAB MAIN ── */
+.fab-main {
+  position: fixed; bottom: calc(28px + env(safe-area-inset-bottom));
+  left: 50%; transform: translateX(-50%);
+  width: 60px; height: 60px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--gold2), var(--gold));
+  border: none; cursor: pointer; z-index: 400;
+  box-shadow: 0 4px 20px rgba(245,166,35,0.5);
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.fab-main:active { transform: translateX(-50%) scale(0.93); }
+.fab-main.open { transform: translateX(-50%) rotate(45deg) scale(1.05); box-shadow: 0 6px 28px rgba(245,166,35,0.6); }
+.fab-icon { font-size: 28px; font-weight: 300; color: #000; line-height: 1; transition: all 0.3s; }
+
+/* ── FAB MENU ── */
+.fab-menu { display: none; }
+.fab-menu.open { display: block; }
+
+.fab-backdrop {
+  position: fixed; inset: 0; z-index: 350;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(4px);
+  animation: fadeIn 0.2s ease;
+}
+
+.fab-items {
+  position: fixed; bottom: calc(100px + env(safe-area-inset-bottom));
+  left: 50%; transform: translateX(-50%);
+  z-index: 360;
+  display: flex; flex-direction: column-reverse; gap: 10px;
+  align-items: center;
+  width: min(340px, 90vw);
+}
+
+.fab-item {
+  display: flex; align-items: center; justify-content: space-between;
+  width: 100%;
+  background: var(--card2);
+  border: 1px solid var(--border2);
+  border-radius: 14px;
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  animation: fabItemIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  gap: 12px;
+}
+.fab-item:hover, .fab-item:active {
+  background: rgba(245,166,35,0.1);
+  border-color: rgba(245,166,35,0.3);
+  transform: scale(1.02);
+}
+.fab-item-label {
+  font-family: 'Heebo', sans-serif;
+  font-size: 15px; font-weight: 600;
+  color: var(--text);
+}
+.fab-item-btn {
+  width: 40px; height: 40px; border-radius: 10px;
+  background: rgba(255,255,255,0.08);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; flex-shrink: 0;
+  font-weight: 700;
+}
+
+/* Stagger animation for each item */
+.fab-item:nth-child(1) { animation-delay: 0.00s; }
+.fab-item:nth-child(2) { animation-delay: 0.04s; }
+.fab-item:nth-child(3) { animation-delay: 0.08s; }
+.fab-item:nth-child(4) { animation-delay: 0.12s; }
+.fab-item:nth-child(5) { animation-delay: 0.16s; }
+.fab-item:nth-child(6) { animation-delay: 0.20s; }
+.fab-item:nth-child(7) { animation-delay: 0.24s; }
+.fab-item:nth-child(8) { animation-delay: 0.28s; }
+.fab-item:nth-child(9) { animation-delay: 0.30s; }
+.fab-item:nth-child(10) { animation-delay: 0.32s; }
+
+@keyframes fabItemIn {
+  from { opacity: 0; transform: translateY(20px) scale(0.9); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* Adjust section padding for bottom nav */
+.section { padding-bottom: 120px !important; }
+
+/* Hide old tabs on mobile */
+@media (max-width: 768px) {
+  .tabs { display: none; }
+}
+/* Show bottom nav only on mobile */
+@media (min-width: 769px) {
+  .bottom-nav { display: none; }
+  .fab-main { display: none; }
+  /* Show tabs on desktop */
+  .tabs { display: flex !important; }
+}

@@ -32,6 +32,42 @@
     window._firebaseConfigured = true;
     console.log("✅ Firebase connected");
   } catch(e) { console.warn("Firebase failed, using localStorage"); }
+
+// ── FAB MENU ──
+let fabOpen = false;
+
+window.toggleFab = function() {
+  fabOpen ? closeFab() : openFab();
+};
+
+window.openFab = function() {
+  fabOpen = true;
+  document.getElementById('fabMenu').classList.add('open');
+  document.getElementById('fabMain').classList.add('open');
+  document.body.style.overflow = 'hidden';
+};
+
+window.closeFab = function() {
+  fabOpen = false;
+  document.getElementById('fabMenu').classList.remove('open');
+  document.getElementById('fabMain').classList.remove('open');
+  document.body.style.overflow = '';
+};
+
+// Update showTab to also update bottom nav
+const _origShowTab = window.showTab;
+window.showTab = function(id, btn) {
+  _origShowTab(id, btn);
+  // Update bottom nav active state
+  document.querySelectorAll('.bnav-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.tab === id);
+  });
+  closeFab();
+};
+
+// Close FAB on back gesture / escape
+document.addEventListener('keydown', e => { if(e.key==='Escape') closeFab(); });
+
 </script>
 </head>
 <body>
@@ -56,19 +92,77 @@
   </div>
 </div>
 
-<!-- TABS -->
-<div class="tabs">
-  <button class="tab-btn active" onclick="showTab('today',this)">📋 היום</button>
-  <button class="tab-btn" onclick="showTab('dashboard',this)">📊 דאשבורד</button>
-  <button class="tab-btn" onclick="showTab('training',this)">💪 אימונים</button>
-  <button class="tab-btn" onclick="showTab('food',this)">🍽️ תזונה</button>
-  <button class="tab-btn" onclick="showTab('water',this)">💧 מים</button>
-  <button class="tab-btn" onclick="showTab('calendar',this)">📅 לוח שנה</button>
-  <button class="tab-btn" onclick="showTab('progress',this)">⚖️ משקל</button>
-  <button class="tab-btn" onclick="showTab('achievements',this)">🏆 הישגים</button>
-  <button class="tab-btn" onclick="showTab('events',this)">🎉 אירועים</button>
-  <button class="tab-btn" onclick="showTab('notifications',this)">🔔 התראות</button>
-  <button class="tab-btn" onclick="showTab('rules',this)">📌 כללים</button>
+<!-- BOTTOM NAV -->
+<nav class="bottom-nav" id="bottomNav">
+  <button class="bnav-btn active" onclick="showTab('today',this)" data-tab="today">
+    <span class="bnav-icon">📋</span>
+    <span class="bnav-label">היום</span>
+  </button>
+  <button class="bnav-btn" onclick="showTab('training',this)" data-tab="training">
+    <span class="bnav-icon">💪</span>
+    <span class="bnav-label">אימון</span>
+  </button>
+  <div class="bnav-fab-space"></div>
+  <button class="bnav-btn" onclick="showTab('food',this)" data-tab="food">
+    <span class="bnav-icon">🍽️</span>
+    <span class="bnav-label">תזונה</span>
+  </button>
+  <button class="bnav-btn" onclick="showTab('dashboard',this)" data-tab="dashboard">
+    <span class="bnav-icon">📊</span>
+    <span class="bnav-label">דאשבורד</span>
+  </button>
+</nav>
+
+<!-- FAB -->
+<button class="fab-main" id="fabMain" onclick="toggleFab()" aria-label="פעולות">
+  <span class="fab-icon" id="fabIcon">+</span>
+</button>
+
+<!-- FAB MENU -->
+<div class="fab-menu" id="fabMenu">
+  <div class="fab-backdrop" onclick="closeFab()"></div>
+  <div class="fab-items">
+    <div class="fab-item" onclick="closeFab();showTab('water',null)">
+      <span class="fab-item-label">מים 💧</span>
+      <span class="fab-item-btn">💧</span>
+    </div>
+    <div class="fab-item" onclick="closeFab();showTab('calendar',null)">
+      <span class="fab-item-label">לוח שנה 📅</span>
+      <span class="fab-item-btn">📅</span>
+    </div>
+    <div class="fab-item" onclick="closeFab();showTab('progress',null)">
+      <span class="fab-item-label">משקל ⚖️</span>
+      <span class="fab-item-btn">⚖️</span>
+    </div>
+    <div class="fab-item" onclick="closeFab();showTab('achievements',null)">
+      <span class="fab-item-label">הישגים 🏆</span>
+      <span class="fab-item-btn">🏆</span>
+    </div>
+    <div class="fab-item" onclick="closeFab();showTab('events',null)">
+      <span class="fab-item-label">מצבים מיוחדים 🎉</span>
+      <span class="fab-item-btn">🎉</span>
+    </div>
+    <div class="fab-item" onclick="closeFab();showTab('notifications',null)">
+      <span class="fab-item-label">התראות 🔔</span>
+      <span class="fab-item-btn">🔔</span>
+    </div>
+    <div class="fab-item" onclick="closeFab();showTab('rules',null)">
+      <span class="fab-item-label">כללים 📌</span>
+      <span class="fab-item-btn">📌</span>
+    </div>
+    <div class="fab-item" onclick="closeFab();window.food.openAddMeal()">
+      <span class="fab-item-label">הוסף ארוחה 🍽️</span>
+      <span class="fab-item-btn" style="background:linear-gradient(135deg,var(--gold2),var(--gold));color:#000;">+</span>
+    </div>
+    <div class="fab-item" onclick="closeFab();window.training.startLiveWorkout && document.querySelector('[onclick*=startLive]')?.click()">
+      <span class="fab-item-label">התחל אימון 💪</span>
+      <span class="fab-item-btn" style="background:linear-gradient(135deg,var(--gold2),var(--gold));color:#000;">▶</span>
+    </div>
+    <div class="fab-item" onclick="closeFab();addWater()">
+      <span class="fab-item-label">+ כוס מים</span>
+      <span class="fab-item-btn" style="background:rgba(96,165,250,0.2);color:var(--blue);">💧</span>
+    </div>
+  </div>
 </div>
 
 <!-- ===== TODAY ===== -->
