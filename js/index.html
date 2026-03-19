@@ -1,0 +1,2555 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>מערכת יואב — דרך ל-80 ק"ג</title>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #080c12;
+  --bg2: #0e1520;
+  --card: #131c2a;
+  --card2: #1a2538;
+  --border: rgba(255,255,255,0.07);
+  --border2: rgba(255,255,255,0.12);
+  --gold: #f5a623;
+  --gold2: #e8834a;
+  --green: #34d399;
+  --green2: #059669;
+  --blue: #60a5fa;
+  --red: #f87171;
+  --purple: #a78bfa;
+  --text: #e2e8f0;
+  --muted: #64748b;
+  --muted2: #94a3b8;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Heebo', sans-serif;
+  min-height: 100vh;
+}
+
+/* ===== HERO ===== */
+.hero {
+  background: linear-gradient(160deg, #0e1a2e 0%, #080c12 60%);
+  padding: 48px 20px 40px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  border-bottom: 1px solid var(--border);
+}
+.hero::before {
+  content:'';
+  position:absolute; top:-120px; left:50%; transform:translateX(-50%);
+  width:700px; height:500px;
+  background: radial-gradient(ellipse, rgba(245,166,35,0.1) 0%, transparent 65%);
+  pointer-events:none;
+}
+.hero-top { display:flex; align-items:center; justify-content:center; gap:10px; margin-bottom:20px; }
+.hero-avatar {
+  width:52px; height:52px; border-radius:50%;
+  background: linear-gradient(135deg, var(--gold), var(--gold2));
+  display:flex; align-items:center; justify-content:center;
+  font-size:22px; font-weight:900; color:#000;
+}
+.hero-name { text-align:right; }
+.hero-name-text { font-size:20px; font-weight:700; }
+.hero-name-sub { font-size:12px; color:var(--muted2); }
+.hero h1 {
+  font-size: clamp(28px,5vw,52px); font-weight:900; line-height:1.1;
+  margin-bottom:10px;
+  background: linear-gradient(135deg, #fff 0%, var(--gold) 100%);
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+}
+.hero-sub { color:var(--muted2); font-size:15px; margin-bottom:28px; }
+
+/* Stats row */
+.stats-row {
+  display:flex; flex-wrap:wrap; gap:10px; justify-content:center; margin-bottom:24px;
+}
+.stat-chip {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--border2);
+  border-radius:100px; padding:8px 18px;
+  font-size:13px; font-weight:500;
+  display:flex; align-items:center; gap:6px;
+}
+.stat-chip .val { color:var(--gold); font-weight:700; }
+
+/* Progress bar */
+.progress-wrap {
+  max-width:480px; margin:0 auto;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border2);
+  border-radius:16px; padding:18px 22px;
+}
+.progress-label {
+  display:flex; justify-content:space-between; margin-bottom:10px;
+  font-size:13px; color:var(--muted2);
+}
+.progress-label span { color:var(--text); font-weight:700; }
+.progress-bar-bg {
+  height:10px; background:rgba(255,255,255,0.08); border-radius:100px; overflow:hidden;
+}
+.progress-bar-fill {
+  height:100%; border-radius:100px;
+  background: linear-gradient(90deg, var(--gold2), var(--gold));
+  transition: width 0.8s ease;
+}
+.progress-note { font-size:11px; color:var(--muted); margin-top:8px; text-align:center; }
+
+/* ===== TABS ===== */
+.tabs {
+  position:sticky; top:0; z-index:200;
+  background:rgba(8,12,18,0.97);
+  backdrop-filter:blur(16px);
+  border-bottom: 1px solid var(--border);
+  display:flex; justify-content:center; gap:4px;
+  padding:10px 12px; flex-wrap:wrap;
+}
+.tab-btn {
+  background:transparent; border:1px solid transparent;
+  border-radius:8px; padding:7px 14px;
+  font-family:'Heebo',sans-serif; font-size:13px; font-weight:500;
+  color:var(--muted2); cursor:pointer; transition:all 0.2s;
+  white-space:nowrap;
+}
+.tab-btn.active { background:rgba(245,166,35,0.12); border-color:rgba(245,166,35,0.35); color:var(--gold); }
+.tab-btn:hover:not(.active) { background:rgba(255,255,255,0.04); color:var(--text); }
+
+/* ===== SECTIONS ===== */
+.section { display:none; padding:28px 16px 80px; max-width:900px; margin:0 auto; }
+.section.active { display:block; }
+.sec-title { font-size:22px; font-weight:800; margin-bottom:4px; }
+.sec-sub { font-size:13px; color:var(--muted2); margin-bottom:24px; }
+
+/* ===== TODAY DASHBOARD ===== */
+.today-grid {
+  display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:20px;
+}
+@media(max-width:520px){ .today-grid { grid-template-columns:1fr; } }
+
+.today-card {
+  background:var(--card); border:1px solid var(--border);
+  border-radius:16px; padding:18px; position:relative; overflow:hidden;
+}
+.today-card::before {
+  content:''; position:absolute; top:0; right:0;
+  width:80px; height:80px; border-radius:50%;
+  background: radial-gradient(circle, rgba(245,166,35,0.08), transparent);
+}
+.today-card-icon { font-size:28px; margin-bottom:10px; }
+.today-card-title { font-size:14px; color:var(--muted2); margin-bottom:4px; }
+.today-card-value { font-size:26px; font-weight:900; color:var(--gold); }
+.today-card-sub { font-size:12px; color:var(--muted); margin-top:4px; }
+
+/* Checklist */
+.checklist { display:flex; flex-direction:column; gap:8px; margin-bottom:20px; }
+.check-item {
+  background:var(--card); border:1px solid var(--border);
+  border-radius:12px; padding:14px 16px;
+  display:flex; align-items:center; gap:12px;
+  cursor:pointer; transition:all 0.2s; user-select:none;
+}
+.check-item:hover { border-color:rgba(255,255,255,0.15); }
+.check-item.done { background:rgba(52,211,153,0.06); border-color:rgba(52,211,153,0.25); }
+.check-item.skipped { background:rgba(248,113,113,0.05); border-color:rgba(248,113,113,0.2); opacity:0.7; }
+.check-box {
+  width:28px; height:28px; border-radius:8px; border:2px solid var(--border2);
+  display:flex; align-items:center; justify-content:center;
+  font-size:14px; flex-shrink:0; transition:all 0.2s;
+  background:rgba(255,255,255,0.03);
+}
+.check-item.done .check-box { background:var(--green2); border-color:var(--green2); }
+.check-item.skipped .check-box { background:rgba(248,113,113,0.3); border-color:var(--red); }
+.check-info { flex:1; }
+.check-title { font-size:14px; font-weight:600; }
+.check-detail { font-size:12px; color:var(--muted2); margin-top:2px; }
+.check-time { font-size:12px; color:var(--gold); font-weight:600; }
+.check-actions { display:flex; gap:6px; }
+.check-btn {
+  border:1px solid var(--border2); background:transparent;
+  border-radius:6px; padding:4px 10px;
+  font-family:'Heebo',sans-serif; font-size:11px; font-weight:600;
+  cursor:pointer; transition:all 0.15s; color:var(--text);
+}
+.check-btn.confirm { border-color:rgba(52,211,153,0.4); color:var(--green); }
+.check-btn.confirm:hover { background:rgba(52,211,153,0.12); }
+.check-btn.skip { border-color:rgba(248,113,113,0.3); color:var(--red); }
+.check-btn.skip:hover { background:rgba(248,113,113,0.08); }
+.check-btn.postpone { border-color:rgba(96,165,250,0.3); color:var(--blue); }
+.check-btn.postpone:hover { background:rgba(96,165,250,0.08); }
+
+/* Water tracker */
+.water-tracker {
+  background:var(--card); border:1px solid var(--border);
+  border-radius:16px; padding:18px 20px; margin-bottom:20px;
+}
+.water-header { display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+.water-title { font-size:16px; font-weight:700; }
+.water-count { font-size:13px; color:var(--muted2); margin-right:auto; }
+.water-cups { display:flex; gap:8px; flex-wrap:wrap; }
+.water-cup {
+  width:40px; height:52px; border-radius:8px;
+  border:2px solid var(--border2);
+  background:rgba(96,165,250,0.04);
+  cursor:pointer; transition:all 0.2s;
+  display:flex; flex-direction:column; align-items:center;
+  justify-content:flex-end; padding-bottom:6px;
+  font-size:10px; color:var(--muted);
+  position:relative; overflow:hidden;
+}
+.water-cup::before {
+  content:''; position:absolute; bottom:0; left:0; right:0;
+  background: linear-gradient(to top, rgba(96,165,250,0.6), rgba(96,165,250,0.2));
+  height:0%; transition:height 0.3s ease; border-radius:0 0 6px 6px;
+}
+.water-cup.filled::before { height:100%; }
+.water-cup.filled { border-color:rgba(96,165,250,0.5); }
+.water-cup span { position:relative; z-index:1; }
+.water-goal { font-size:12px; color:var(--muted2); margin-top:10px; }
+
+/* ===== TRAINING ===== */
+.training-week {
+  display:grid; grid-template-columns:repeat(7,1fr); gap:6px; margin-bottom:24px;
+}
+@media(max-width:500px){ .training-week { grid-template-columns:repeat(4,1fr); } }
+.tw-day {
+  background:var(--card); border:1px solid var(--border);
+  border-radius:10px; padding:10px 6px; text-align:center; cursor:pointer;
+  transition:all 0.2s;
+}
+.tw-day.workout { border-color:rgba(245,166,35,0.3); background:rgba(245,166,35,0.05); }
+.tw-day.walk { border-color:rgba(96,165,250,0.25); background:rgba(96,165,250,0.04); }
+.tw-day.rest { opacity:0.5; }
+.tw-day-name { font-size:10px; color:var(--muted2); margin-bottom:5px; letter-spacing:0.5px; }
+.tw-day-icon { font-size:20px; margin-bottom:4px; }
+.tw-day-label { font-size:10px; font-weight:600; }
+.tw-day.workout .tw-day-label { color:var(--gold); }
+.tw-day.walk .tw-day-label { color:var(--blue); }
+
+/* Training card */
+.tr-card {
+  background:var(--card); border:1px solid var(--border);
+  border-radius:16px; overflow:hidden; margin-bottom:16px;
+}
+.tr-card-head {
+  padding:16px 20px 12px;
+  border-bottom:1px solid var(--border);
+  display:flex; align-items:center; gap:12px;
+}
+.tr-icon {
+  width:44px; height:44px; border-radius:10px;
+  background:rgba(245,166,35,0.12);
+  display:flex; align-items:center; justify-content:center;
+  font-size:22px; flex-shrink:0;
+}
+.tr-title { font-size:16px; font-weight:700; }
+.tr-meta { font-size:12px; color:var(--muted2); margin-top:2px; }
+.tr-body { padding:16px 20px; }
+
+/* Exercise rows */
+.ex-row {
+  display:flex; align-items:flex-start; gap:12px;
+  padding:12px 0; border-bottom:1px solid rgba(255,255,255,0.04);
+}
+.ex-row:last-child { border-bottom:none; }
+.ex-num {
+  width:28px; height:28px; border-radius:7px;
+  background:rgba(245,166,35,0.1); color:var(--gold);
+  font-size:12px; font-weight:700;
+  display:flex; align-items:center; justify-content:center; flex-shrink:0;
+}
+.ex-info { flex:1; }
+.ex-name { font-size:14px; font-weight:600; }
+.ex-note { font-size:12px; color:var(--muted2); margin-top:2px; }
+.ex-right { text-align:left; flex-shrink:0; }
+.ex-sets { font-size:13px; font-weight:700; color:var(--gold); }
+.ex-yt {
+  display:inline-flex; align-items:center; gap:4px;
+  font-size:11px; color:var(--red);
+  background:rgba(248,113,113,0.1); border-radius:4px;
+  padding:2px 7px; margin-top:4px; text-decoration:none;
+  border:1px solid rgba(248,113,113,0.2);
+}
+
+/* Walk progression */
+.walk-prog {
+  display:grid; grid-template-columns:repeat(auto-fill,minmax(110px,1fr)); gap:8px;
+  margin-bottom:16px;
+}
+.walk-box {
+  background:var(--card); border:1px solid var(--border);
+  border-radius:10px; padding:12px; text-align:center;
+}
+.walk-wk { font-size:10px; color:var(--muted); letter-spacing:1px; text-transform:uppercase; margin-bottom:6px; }
+.walk-km { font-size:24px; font-weight:900; color:var(--blue); line-height:1; }
+.walk-km span { font-size:12px; font-weight:400; color:var(--muted2); }
+.walk-days { font-size:11px; color:var(--text); margin-top:3px; }
+
+/* ===== FOOD ===== */
+.food-day {
+  background:var(--card); border:1px solid var(--border);
+  border-radius:16px; overflow:hidden; margin-bottom:14px;
+}
+.food-day-head {
+  padding:14px 20px; background:rgba(255,255,255,0.02);
+  border-bottom:1px solid var(--border);
+  font-weight:700; font-size:15px; display:flex; align-items:center; gap:8px;
+}
+.meal-row {
+  display:flex; gap:14px; padding:14px 20px;
+  border-bottom:1px solid rgba(255,255,255,0.04);
+}
+.meal-row:last-child { border-bottom:none; }
+.meal-time-col { flex-shrink:0; width:60px; text-align:center; }
+.meal-time-badge {
+  display:block; font-size:13px; font-weight:700; color:var(--gold);
+  background:rgba(245,166,35,0.1); border-radius:7px;
+  padding:4px 6px; margin-bottom:4px;
+}
+.meal-type-tag { font-size:10px; color:var(--muted); font-weight:600; letter-spacing:0.5px; }
+.meal-content { flex:1; }
+.meal-name { font-weight:600; font-size:15px; margin-bottom:4px; }
+.meal-items { font-size:13px; color:var(--muted2); line-height:1.8; }
+.meal-cal {
+  display:inline-block; font-size:11px; color:var(--green);
+  background:rgba(52,211,153,0.08); border-radius:5px;
+  padding:2px 8px; margin-top:6px; font-weight:600;
+}
+.macro-row { display:flex; gap:8px; margin-top:6px; flex-wrap:wrap; }
+.macro-chip {
+  font-size:11px; border-radius:5px; padding:2px 8px; font-weight:600;
+}
+.macro-chip.protein { background:rgba(167,139,250,0.1); color:var(--purple); }
+.macro-chip.carb { background:rgba(245,166,35,0.1); color:var(--gold); }
+.macro-chip.fat { background:rgba(96,165,250,0.1); color:var(--blue); }
+
+/* Cheat meal */
+.cheat-box {
+  background:rgba(248,113,113,0.05); border:1px solid rgba(248,113,113,0.2);
+  border-radius:12px; padding:14px 18px; font-size:13px; line-height:1.7;
+}
+.cheat-box strong { color:var(--red); }
+
+/* ===== INFO BOXES ===== */
+.info-box {
+  background:rgba(96,165,250,0.05); border:1px solid rgba(96,165,250,0.18);
+  border-radius:12px; padding:13px 16px;
+  font-size:13px; line-height:1.7; margin-bottom:16px;
+}
+.info-box strong { color:var(--blue); }
+.warn-box {
+  background:rgba(245,166,35,0.05); border:1px solid rgba(245,166,35,0.2);
+  border-radius:12px; padding:13px 16px;
+  font-size:13px; line-height:1.7; margin-bottom:16px;
+}
+.warn-box strong { color:var(--gold); }
+
+/* ===== PHASES ===== */
+.phase-timeline { position:relative; padding-right:26px; }
+.phase-timeline::before {
+  content:''; position:absolute; right:9px; top:0; bottom:0;
+  width:2px; background:linear-gradient(to bottom, var(--gold), transparent);
+}
+.phase-card {
+  background:var(--card); border:1px solid var(--border);
+  border-radius:14px; padding:18px 20px; margin-bottom:14px; position:relative;
+}
+.phase-card::before {
+  content:''; position:absolute; right:-21px; top:24px;
+  width:12px; height:12px; border-radius:50%;
+  background:var(--gold); border:3px solid var(--bg);
+}
+.phase-num { font-size:10px; letter-spacing:2px; color:var(--gold); font-weight:600; text-transform:uppercase; margin-bottom:4px; }
+.phase-title { font-size:16px; font-weight:700; margin-bottom:6px; }
+.phase-desc { font-size:13px; color:var(--muted2); line-height:1.7; }
+
+/* ===== RULES ===== */
+.rules-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:12px; }
+.rule-card {
+  background:var(--card); border:1px solid var(--border);
+  border-radius:14px; padding:16px;
+}
+.rule-icon { font-size:24px; margin-bottom:8px; }
+.rule-title { font-weight:700; font-size:14px; margin-bottom:5px; }
+.rule-text { font-size:13px; color:var(--muted2); line-height:1.6; }
+
+
+.day-toggle {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-family: 'Heebo', sans-serif;
+  font-size: 13px;
+  color: var(--muted2);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.day-toggle.active {
+  background: rgba(245,166,35,0.15);
+  border-color: rgba(245,166,35,0.5);
+  color: var(--gold);
+  font-weight: 700;
+}
+
+
+.rule-type-btn {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  padding: 7px 14px;
+  font-family: 'Heebo', sans-serif;
+  font-size: 13px;
+  color: var(--muted2);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.rule-type-btn.active {
+  background: rgba(245,166,35,0.15);
+  border-color: rgba(245,166,35,0.5);
+  color: var(--gold);
+  font-weight: 700;
+}
+.rule-day-btn {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-family: 'Heebo', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted2);
+  cursor: pointer;
+  transition: all 0.15s;
+  min-width: 36px;
+}
+.rule-day-btn.active {
+  background: rgba(96,165,250,0.15);
+  border-color: rgba(96,165,250,0.5);
+  color: var(--blue);
+}
+.notif-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.notif-card.disabled { opacity: 0.5; }
+.notif-toggle {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  flex-shrink: 0;
+}
+.notif-toggle input { opacity: 0; width: 0; height: 0; }
+.notif-slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background: rgba(255,255,255,0.1);
+  border-radius: 24px;
+  transition: 0.3s;
+}
+.notif-slider:before {
+  content: '';
+  position: absolute;
+  width: 18px; height: 18px;
+  left: 3px; top: 3px;
+  background: white;
+  border-radius: 50%;
+  transition: 0.3s;
+}
+.notif-toggle input:checked + .notif-slider { background: var(--gold); }
+.notif-toggle input:checked + .notif-slider:before { transform: translateX(20px); }
+
+/* Divider */
+.divider { border:none; border-top:1px solid var(--border); margin:24px 0; }
+
+/* Tag */
+.tag {
+  display:inline-flex; align-items:center; gap:5px;
+  border-radius:100px; padding:4px 12px; font-size:12px; font-weight:600;
+  margin-bottom:16px;
+}
+.tag.green { background:rgba(52,211,153,0.1); border:1px solid rgba(52,211,153,0.25); color:var(--green); }
+.tag.gold { background:rgba(245,166,35,0.1); border:1px solid rgba(245,166,35,0.25); color:var(--gold); }
+.tag.blue { background:rgba(96,165,250,0.1); border:1px solid rgba(96,165,250,0.25); color:var(--blue); }
+
+/* Toast */
+.toast {
+  position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(100px);
+  background:#1a2538; border:1px solid var(--border2);
+  border-radius:12px; padding:12px 20px;
+  font-size:14px; font-weight:600; z-index:9999;
+  transition:transform 0.3s ease; white-space:nowrap;
+  box-shadow:0 8px 32px rgba(0,0,0,0.4);
+}
+.toast.show { transform:translateX(-50%) translateY(0); }
+
+/* Floating action */
+.fab-area {
+  position:fixed; bottom:20px; right:16px; z-index:150;
+  display:flex; flex-direction:column; gap:8px; align-items:flex-end;
+}
+.fab {
+  background: linear-gradient(135deg, var(--gold2), var(--gold));
+  color:#000; border:none; border-radius:100px;
+  padding:10px 18px; font-family:'Heebo',sans-serif;
+  font-size:13px; font-weight:700; cursor:pointer;
+  box-shadow:0 4px 16px rgba(245,166,35,0.35);
+  transition:all 0.2s;
+}
+.fab:hover { transform:translateY(-2px); box-shadow:0 6px 24px rgba(245,166,35,0.45); }
+
+
+/* ═══════════════════════════════
+   BOTTOM NAV + FAB (v5 clean)
+═══════════════════════════════ */
+.tabs { display: none !important; }
+.section { padding-bottom: 90px !important; }
+
+.bottom-nav {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 300;
+  background: rgba(8,12,18,0.97);
+  backdrop-filter: blur(20px);
+  border-top: 1px solid rgba(255,255,255,0.08);
+  display: flex; align-items: center;
+  height: 60px; padding: 0 4px;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.bnav-btn {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 2px;
+  background: transparent; border: none; cursor: pointer;
+  padding: 6px 2px; border-radius: 10px;
+  color: #64748b; font-family: 'Heebo', sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+.bnav-btn.active { color: #f5a623; }
+.bnav-icon { font-size: 20px; line-height: 1; }
+.bnav-label { font-size: 9px; font-weight: 600; white-space: nowrap; }
+.bnav-fab-space { width: 56px; flex-shrink: 0; }
+
+.fab-btn {
+  position: fixed;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  left: 50%; transform: translateX(-50%);
+  width: 54px; height: 54px; border-radius: 50%;
+  background: linear-gradient(135deg, #e8834a, #f5a623);
+  border: none; cursor: pointer; z-index: 400;
+  box-shadow: 0 3px 16px rgba(245,166,35,0.45);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 26px; color: #000; font-weight: 300;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  -webkit-tap-highlight-color: transparent;
+}
+.fab-btn.open { transform: translateX(-50%) rotate(45deg); }
+
+.fab-overlay {
+  position: fixed; inset: 0; z-index: 350;
+  background: rgba(0,0,0,0.78);
+  backdrop-filter: blur(6px);
+  display: none;
+}
+.fab-overlay.show { display: block; }
+
+.fab-menu {
+  position: fixed;
+  top: 0; bottom: calc(68px + env(safe-area-inset-bottom, 0px));
+  left: 50%; transform: translateX(-50%);
+  width: min(340px, 92vw);
+  z-index: 360;
+  display: flex; flex-direction: column;
+  gap: 7px; overflow-y: auto;
+  padding: 52px 0 16px;
+  scrollbar-width: none;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.fab-menu::-webkit-scrollbar { display: none; }
+.fab-menu.show { pointer-events: all; opacity: 1; }
+
+.fab-item {
+  background: #1c2534;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 13px;
+  padding: 12px 14px;
+  display: flex; align-items: center;
+  justify-content: space-between; gap: 10px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  animation: fabIn 0.18s ease both;
+}
+.fab-item:active { background: rgba(245,166,35,0.12); }
+.fab-item-txt { font-size: 14px; font-weight: 600; color: #e2e8f0; font-family: 'Heebo', sans-serif; }
+.fab-item-ico {
+  width: 36px; height: 36px; border-radius: 9px;
+  background: rgba(255,255,255,0.07);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; flex-shrink: 0;
+}
+@keyframes fabIn {
+  from { opacity:0; transform:translateY(10px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+</style>
+
+  <!-- PWA manifest -->
+  <link rel="manifest" id="pwaManifest">
+  <meta name="theme-color" content="#080c12">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="יואב Fit">
+  <!-- Firebase -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getFirestore, doc, setDoc, getDoc, collection, getDocs, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    
+    const firebaseConfig = {
+      apiKey: "AIzaSyBtYMSjABXLCshcd30v8tijc3AZV3i1Q4U",
+      authDomain: "yoav-fitness--web-app.firebaseapp.com",
+      projectId: "yoav-fitness--web-app",
+      storageBucket: "yoav-fitness--web-app.firebasestorage.app",
+      messagingSenderId: "137058543324",
+      appId: "1:137058543324:web:d09995a0cba119fa98b619",
+      measurementId: "G-S1L6G3EWCS"
+    };
+    
+    window._firebaseConfigured = false; // will be true after init
+    
+    try {
+      const app = initializeApp(firebaseConfig);
+      const db = getFirestore(app);
+      window._db = db;
+      window._fbops = { doc, setDoc, getDoc, collection, getDocs, deleteDoc, updateDoc };
+      window._firebaseConfigured = true;
+      console.log("✅ Firebase connected - yoav-fitness--web-app");
+    } catch(e) {
+      console.warn("Firebase error:", e.message);
+      window._firebaseConfigured = false;
+    }
+  </script>
+</head>
+<body>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-top">
+    <div class="hero-avatar">י</div>
+    <div class="hero-name">
+      <div class="hero-name-text">יואב, 35</div>
+      <div class="hero-name-sub">גובה 176 | משקל נוכחי ~100 ק"ג</div>
+    </div>
+  </div>
+  <h1>דרך ל-80 ק"ג 🎯</h1>
+  <div class="hero-sub">מערכת מלאה • אימונים + תזונה + מים • מסונכרן</div>
+
+  <div class="stats-row">
+    <div class="stat-chip">⚖️ יעד: <span class="val">-20 ק"ג</span></div>
+    <div class="stat-chip">🔥 ~<span class="val">1,900</span> קל׳ ביום</div>
+    <div class="stat-chip">📅 זמן משוער: <span class="val">7–9 חודשים</span></div>
+    <div class="stat-chip">💧 מים: <span class="val">10–12</span> כוסות</div>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-label">
+      <span>100 ק"ג</span>
+      <span>יעד: 80 ק"ג</span>
+    </div>
+    <div class="progress-bar-bg">
+      <div class="progress-bar-fill" id="progressBar" style="width:0%"></div>
+    </div>
+    <div class="progress-note" id="progressNote">עדכן את המשקל שלך בלשונית "התקדמות" כדי לראות את הפרוגרס</div>
+  </div>
+</div>
+
+
+
+<!-- ===== TODAY ===== -->
+<div class="section active" id="today">
+  <div class="sec-title">היום שלי</div>
+  <div class="sec-sub" id="todayDate">טוען תאריך...</div>
+
+  <div class="today-grid">
+    <div class="today-card">
+      <div class="today-card-icon">🔥</div>
+      <div class="today-card-title">קלוריות מטרה</div>
+      <div class="today-card-value">1,900</div>
+      <div class="today-card-sub">~950 לארוחה</div>
+    </div>
+    <div class="today-card">
+      <div class="today-card-icon">💧</div>
+      <div class="today-card-title">מים מטרה</div>
+      <div class="today-card-value">10–12</div>
+      <div class="today-card-sub">כוסות של 250 מ"ל</div>
+    </div>
+  </div>
+
+  <div class="warn-box">
+    <strong>✅ המשימות של היום:</strong> סמן כל משימה לאחר ביצוע. אפשר לאשר, לדחות לשעה אחרת, או לסמן שדילגת.
+  </div>
+
+  <div class="checklist" id="todayChecklist">
+    <div class="check-item" data-id="morning-water">
+      <div class="check-box">💧</div>
+      <div class="check-info">
+        <div class="check-title">כוס מים בקימה</div>
+        <div class="check-detail">לפני קפה, לפני הכל — קיבה ריקה</div>
+      </div>
+      <div class="check-time">06:30</div>
+      <div class="check-actions">
+        <button class="check-btn confirm" onclick="markItem(this,'done')">✓ עשיתי</button>
+        <button class="check-btn skip" onclick="markItem(this,'skipped')">✗ דילגתי</button>
+      </div>
+    </div>
+    <div class="check-item" data-id="meal1">
+      <div class="check-box">🍳</div>
+      <div class="check-info">
+        <div class="check-title">ארוחה 1 — בוקר מחזק</div>
+        <div class="check-detail">3 ביצים + לחם מלא + ירק + קפה | ~550 קל׳</div>
+      </div>
+      <div class="check-time">08:30</div>
+      <div class="check-actions">
+        <button class="check-btn confirm" onclick="markItem(this,'done')">✓ אכלתי</button>
+        <button class="check-btn postpone" onclick="markItem(this,'postpone')">⏰ דחיתי</button>
+        <button class="check-btn skip" onclick="markItem(this,'skipped')">✗ דילגתי</button>
+      </div>
+    </div>
+    <div class="check-item" data-id="water-mid">
+      <div class="check-box">💧</div>
+      <div class="check-info">
+        <div class="check-title">2 כוסות מים — אמצע בוקר</div>
+        <div class="check-detail">שמור על קצב שתייה לאורך היום</div>
+      </div>
+      <div class="check-time">10:30</div>
+      <div class="check-actions">
+        <button class="check-btn confirm" onclick="markItem(this,'done')">✓ שתיתי</button>
+        <button class="check-btn skip" onclick="markItem(this,'skipped')">✗ שכחתי</button>
+      </div>
+    </div>
+    <div class="check-item" data-id="snack">
+      <div class="check-box">🍌</div>
+      <div class="check-info">
+        <div class="check-title">חטיף לפני אימון (ביום אימון)</div>
+        <div class="check-detail">בננה + חופן שקדים | ~200 קל׳</div>
+      </div>
+      <div class="check-time">11:00</div>
+      <div class="check-actions">
+        <button class="check-btn confirm" onclick="markItem(this,'done')">✓ אכלתי</button>
+        <button class="check-btn skip" onclick="markItem(this,'skipped')">✗ לא רלוונטי</button>
+      </div>
+    </div>
+    <div class="check-item" data-id="workout">
+      <div class="check-box">💪</div>
+      <div class="check-info">
+        <div class="check-title">אימון — לפי תוכנית</div>
+        <div class="check-detail">35–45 דקות | ראה לשונית אימונים לפרטים</div>
+      </div>
+      <div class="check-time">11:30</div>
+      <div class="check-actions">
+        <button class="check-btn confirm" onclick="markItem(this,'done')">✓ עשיתי!</button>
+        <button class="check-btn postpone" onclick="markItem(this,'postpone')">⏰ דחיתי לערב</button>
+        <button class="check-btn skip" onclick="markItem(this,'skipped')">✗ דילגתי</button>
+      </div>
+    </div>
+    <div class="check-item" data-id="meal2">
+      <div class="check-box">🥩</div>
+      <div class="check-info">
+        <div class="check-title">ארוחה 2 — צהריים עיקרית</div>
+        <div class="check-detail">בשר/עוף/דג + פחמימה + ירק | ~750 קל׳</div>
+      </div>
+      <div class="check-time">14:00</div>
+      <div class="check-actions">
+        <button class="check-btn confirm" onclick="markItem(this,'done')">✓ אכלתי</button>
+        <button class="check-btn postpone" onclick="markItem(this,'postpone')">⏰ דחיתי</button>
+        <button class="check-btn skip" onclick="markItem(this,'skipped')">✗ דילגתי</button>
+      </div>
+    </div>
+    <div class="check-item" data-id="water-aft">
+      <div class="check-box">💧</div>
+      <div class="check-info">
+        <div class="check-title">מים אחר הצהריים</div>
+        <div class="check-detail">עוד 2–3 כוסות לאורך אחה"צ</div>
+      </div>
+      <div class="check-time">15:30</div>
+      <div class="check-actions">
+        <button class="check-btn confirm" onclick="markItem(this,'done')">✓ שתיתי</button>
+        <button class="check-btn skip" onclick="markItem(this,'skipped')">✗ שכחתי</button>
+      </div>
+    </div>
+    <div class="check-item" data-id="evening-snack">
+      <div class="check-box">🍎</div>
+      <div class="check-info">
+        <div class="check-title">חטיף ערב — אם יש רעב</div>
+        <div class="check-detail">תפוח גרנד סמית׳ / יוגורט / אגוזים | ~150 קל׳</div>
+      </div>
+      <div class="check-time">17:30</div>
+      <div class="check-actions">
+        <button class="check-btn confirm" onclick="markItem(this,'done')">✓ אכלתי</button>
+        <button class="check-btn skip" onclick="markItem(this,'skipped')">✗ לא הייתי רעב</button>
+      </div>
+    </div>
+    <div class="check-item" data-id="night-water">
+      <div class="check-box">💧</div>
+      <div class="check-info">
+        <div class="check-title">כוס מים לפני שינה</div>
+        <div class="check-detail">מאיץ חילוף חומרים בלילה</div>
+      </div>
+      <div class="check-time">22:00</div>
+      <div class="check-actions">
+        <button class="check-btn confirm" onclick="markItem(this,'done')">✓ שתיתי</button>
+        <button class="check-btn skip" onclick="markItem(this,'skipped')">✗ שכחתי</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="info-box" id="dayScore" style="display:none">
+    <strong>📊 ציון היום:</strong> <span id="dayScoreText"></span>
+  </div>
+</div>
+
+<!-- ===== TRAINING ===== -->
+<div class="section" id="training">
+  <div class="sec-title">תוכנית אימונים</div>
+  <div class="sec-sub">חוץ בלבד | ללא ציוד | גמיש — בוקר או ערב</div>
+
+  <div class="info-box">
+    <strong>✏️ הכל ניתן לעריכה:</strong> לחץ על כל אימון לעריכה מלאה — הוסף/הסר תרגילים, שנה סטים וחזרות, שנה ימים, הוסף אימון חדש.
+  </div>
+
+  <!-- Week display -->
+  <div class="training-week" id="weekDisplay"></div>
+
+  <!-- Workouts list -->
+  <div id="workoutsList"></div>
+
+  <!-- Add new workout button -->
+  <button onclick="openWorkoutEditor(null)" style="width:100%;background:rgba(245,166,35,0.06);border:1px dashed rgba(245,166,35,0.35);border-radius:14px;padding:14px;font-family:Heebo,sans-serif;font-size:14px;font-weight:700;color:var(--gold);cursor:pointer;margin-top:8px;transition:all 0.2s;">
+    + הוסף אימון חדש
+  </button>
+
+  <!-- WORKOUT EDITOR MODAL -->
+  <div id="workoutEditorModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:600;overflow-y:auto;padding:12px 8px;">
+    <div style="background:#161b27;border:1px solid rgba(255,255,255,0.12);border-radius:20px;max-width:680px;margin:0 auto;overflow:hidden;">
+      
+      <div style="padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.07);display:flex;align-items:center;justify-content:space-between;">
+        <div id="editorTitle" style="font-size:17px;font-weight:800;">✏️ עריכת אימון</div>
+        <button onclick="closeWorkoutEditor()" style="background:rgba(255,255,255,0.08);border:none;color:var(--text);border-radius:8px;padding:7px 14px;font-family:Heebo,sans-serif;font-size:13px;cursor:pointer;">✕</button>
+      </div>
+
+      <div style="padding:16px 20px;overflow-y:auto;max-height:80vh;">
+        <!-- Workout name -->
+        <div style="margin-bottom:16px;">
+          <label style="font-size:12px;color:var(--muted2);font-weight:600;display:block;margin-bottom:6px;">שם האימון</label>
+          <input id="weName" type="text" placeholder="למשל: אימון א׳ — רגליים" style="width:100%;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:10px 14px;font-family:Heebo,sans-serif;font-size:14px;color:var(--text);outline:none;" />
+        </div>
+
+        <!-- Days of week -->
+        <div style="margin-bottom:16px;">
+          <label style="font-size:12px;color:var(--muted2);font-weight:600;display:block;margin-bottom:8px;">ימי האימון בשבוע</label>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;" id="weDays">
+            <button class="day-toggle" data-day="0" onclick="toggleDay(this)">ראשון</button>
+            <button class="day-toggle" data-day="1" onclick="toggleDay(this)">שני</button>
+            <button class="day-toggle" data-day="2" onclick="toggleDay(this)">שלישי</button>
+            <button class="day-toggle" data-day="3" onclick="toggleDay(this)">רביעי</button>
+            <button class="day-toggle" data-day="4" onclick="toggleDay(this)">חמישי</button>
+            <button class="day-toggle" data-day="5" onclick="toggleDay(this)">שישי</button>
+            <button class="day-toggle" data-day="6" onclick="toggleDay(this)">שבת</button>
+          </div>
+        </div>
+
+        <!-- Type -->
+        <div style="margin-bottom:16px;">
+          <label style="font-size:12px;color:var(--muted2);font-weight:600;display:block;margin-bottom:6px;">סוג</label>
+          <select id="weType" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:10px 14px;font-family:Heebo,sans-serif;font-size:14px;color:var(--text);outline:none;width:100%;">
+            <option value="workout">💪 אימון כוח</option>
+            <option value="walk">🚶 הליכה</option>
+            <option value="cardio">🏃 ריצה / קרדיו</option>
+            <option value="stretch">🧘 מתיחות</option>
+            <option value="rest">😴 מנוחה</option>
+          </select>
+        </div>
+
+        <!-- Duration -->
+        <div style="margin-bottom:16px;">
+          <label style="font-size:12px;color:var(--muted2);font-weight:600;display:block;margin-bottom:6px;">משך (דקות)</label>
+          <input id="weDuration" type="number" value="40" min="10" max="120" style="width:120px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:10px 14px;font-family:Heebo,sans-serif;font-size:14px;color:var(--text);outline:none;" />
+        </div>
+
+        <!-- Notes -->
+        <div style="margin-bottom:20px;">
+          <label style="font-size:12px;color:var(--muted2);font-weight:600;display:block;margin-bottom:6px;">הערות כלליות</label>
+          <textarea id="weNotes" rows="2" placeholder="מנוחה בין סטים, ציוד, מיקום..." style="width:100%;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:10px 14px;font-family:Heebo,sans-serif;font-size:13px;color:var(--text);outline:none;resize:vertical;"></textarea>
+        </div>
+
+        <!-- Exercises -->
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <label style="font-size:13px;font-weight:700;">תרגילים</label>
+          <button onclick="addExerciseRow()" style="background:rgba(245,166,35,0.12);border:1px solid rgba(245,166,35,0.3);color:var(--gold);border-radius:8px;padding:6px 14px;font-family:Heebo,sans-serif;font-size:12px;font-weight:600;cursor:pointer;">+ הוסף תרגיל</button>
+        </div>
+        <div id="weExercises" style="display:flex;flex-direction:column;gap:8px;"></div>
+
+        <!-- Save/Delete buttons -->
+        <div style="display:flex;gap:8px;margin-top:20px;justify-content:space-between;">
+          <button id="weDeleteBtn" onclick="deleteWorkout()" style="background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.25);color:var(--red);border-radius:10px;padding:10px 18px;font-family:Heebo,sans-serif;font-size:14px;cursor:pointer;display:none;">🗑 מחק אימון</button>
+          <div style="display:flex;gap:8px;margin-right:auto;">
+            <button onclick="closeWorkoutEditor()" style="background:rgba(255,255,255,0.06);border:1px solid var(--border);color:var(--muted2);border-radius:10px;padding:10px 18px;font-family:Heebo,sans-serif;font-size:14px;cursor:pointer;">ביטול</button>
+            <button onclick="saveWorkout()" style="background:linear-gradient(135deg,#e8834a,#f5a623);color:#000;border:none;border-radius:10px;padding:10px 24px;font-family:Heebo,sans-serif;font-size:14px;font-weight:700;cursor:pointer;">שמור ✓</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Walk progression -->
+  <div class="tr-card" style="margin-top:20px;">
+    <div class="tr-card-head">
+      <div class="tr-icon">🚶</div>
+      <div>
+        <div class="tr-title">התקדמות הליכה</div>
+        <div class="tr-meta">עולה בהדרגה לאורך 6 שבועות</div>
+      </div>
+    </div>
+    <div class="tr-body">
+      <div class="walk-prog">
+        <div class="walk-box"><div class="walk-wk">שבוע 1–2</div><div class="walk-km">2<span> ק"מ</span></div><div class="walk-days">× 2</div></div>
+        <div class="walk-box"><div class="walk-wk">שבוע 3</div><div class="walk-km">2.5<span> ק"מ</span></div><div class="walk-days">× 2</div></div>
+        <div class="walk-box"><div class="walk-wk">שבוע 4</div><div class="walk-km">3<span> ק"מ</span></div><div class="walk-days">× 2</div></div>
+        <div class="walk-box"><div class="walk-wk">שבוע 5–6</div><div class="walk-km">3.5<span> ק"מ</span></div><div class="walk-days">× 3</div></div>
+        <div class="walk-box"><div class="walk-wk">שבוע 7+</div><div class="walk-km">4<span> ק"מ</span></div><div class="walk-days">× 3</div></div>
+        <div class="walk-box"><div class="walk-wk">חודש 3+</div><div class="walk-km">5<span> ק"מ</span></div><div class="walk-days">ריצה</div></div>
+      </div>
+      <div class="warn-box"><strong>⚠️ כאב חד בברך = עצור.</strong> מתיחות אחרי כל הליכה — חובה.</div>
+    </div>
+  </div>
+</div>
+<!-- ===== FOOD ===== -->
+<div class="section" id="food">
+  <div class="sec-title">יומן אכילה 📖</div>
+  <div class="sec-sub">הוסף ארוחות, חפש מוצרים, עקוב אחרי קלוריות ומאקרו</div>
+
+  <!-- Daily Summary Bar -->
+  <div id="dailySummaryBar" style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px 20px;margin-bottom:16px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+      <div style="font-weight:700;font-size:15px;" id="todayDateFood">היום</div>
+      <div style="display:flex;gap:6px;">
+        <button onclick="changeDay(-1)" style="background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:8px;padding:5px 10px;color:var(--text);font-family:Heebo,sans-serif;font-size:13px;cursor:pointer;">◀ אתמול</button>
+        <button onclick="changeDay(1)" style="background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:8px;padding:5px 10px;color:var(--text);font-family:Heebo,sans-serif;font-size:13px;cursor:pointer;">מחר ▶</button>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;">
+      <div style="text-align:center;">
+        <div style="font-size:10px;color:var(--muted2);letter-spacing:1px;margin-bottom:4px;">קלוריות</div>
+        <div id="dayCal" style="font-size:22px;font-weight:900;color:var(--gold);">0</div>
+        <div style="font-size:10px;color:var(--muted);">/ 1,900</div>
+      </div>
+      <div style="text-align:center;">
+        <div style="font-size:10px;color:var(--muted2);letter-spacing:1px;margin-bottom:4px;">חלבון</div>
+        <div id="dayProt" style="font-size:22px;font-weight:900;color:var(--purple);">0g</div>
+        <div style="font-size:10px;color:var(--muted);">יעד 130g</div>
+      </div>
+      <div style="text-align:center;">
+        <div style="font-size:10px;color:var(--muted2);letter-spacing:1px;margin-bottom:4px;">פחמימה</div>
+        <div id="dayCarb" style="font-size:22px;font-weight:900;color:var(--blue);">0g</div>
+        <div style="font-size:10px;color:var(--muted);">יעד 180g</div>
+      </div>
+      <div style="text-align:center;">
+        <div style="font-size:10px;color:var(--muted2);letter-spacing:1px;margin-bottom:4px;">שומן</div>
+        <div id="dayFat" style="font-size:22px;font-weight:900;color:var(--green);">0g</div>
+        <div style="font-size:10px;color:var(--muted);">יעד 60g</div>
+      </div>
+    </div>
+    <div style="margin-top:12px;">
+      <div style="height:6px;background:rgba(255,255,255,0.06);border-radius:100px;overflow:hidden;">
+        <div id="dayCalBar" style="height:100%;background:linear-gradient(90deg,var(--gold2),var(--gold));border-radius:100px;width:0%;transition:width 0.5s;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Meal Button -->
+  <button onclick="openAddMeal()" style="width:100%;background:linear-gradient(135deg,rgba(245,166,35,0.12),rgba(232,131,74,0.08));border:1px dashed rgba(245,166,35,0.4);border-radius:14px;padding:16px;font-family:Heebo,sans-serif;font-size:15px;font-weight:700;color:var(--gold);cursor:pointer;margin-bottom:16px;transition:all 0.2s;" onmouseover="this.style.background='rgba(245,166,35,0.15)'" onmouseout="this.style.background='linear-gradient(135deg,rgba(245,166,35,0.12),rgba(232,131,74,0.08))'">
+    + הוסף ארוחה / מה שאכלתי
+  </button>
+
+  <!-- Meals List for today -->
+  <div id="mealsList"></div>
+
+  <!-- Weekly Summary Toggle -->
+  <div style="margin-top:8px;">
+    <button onclick="toggleWeeklySummary()" style="width:100%;background:rgba(96,165,250,0.06);border:1px solid rgba(96,165,250,0.2);border-radius:12px;padding:12px;font-family:Heebo,sans-serif;font-size:13px;font-weight:600;color:var(--blue);cursor:pointer;">
+      📊 סיכום שבועי / חודשי
+    </button>
+    <div id="weeklySummary" style="display:none;margin-top:8px;"></div>
+  </div>
+
+  <!-- ADD MEAL MODAL -->
+  <div id="addMealModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:600;overflow-y:auto;padding:12px 8px;">
+    <div style="background:#161b27;border:1px solid rgba(255,255,255,0.12);border-radius:20px;max-width:680px;margin:0 auto;overflow:hidden;">
+      
+      <!-- Header -->
+      <div style="padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.07);display:flex;align-items:center;justify-content:space-between;gap:8px;">
+        <div style="font-size:17px;font-weight:800;">🍽️ הוסף ארוחה</div>
+        <button onclick="closeAddMeal()" style="background:rgba(255,255,255,0.08);border:none;color:var(--text);border-radius:8px;padding:7px 14px;font-family:Heebo,sans-serif;font-size:13px;cursor:pointer;">✕</button>
+      </div>
+
+      <!-- Meal Name -->
+      <div style="padding:14px 20px;border-bottom:1px solid rgba(255,255,255,0.07);">
+        <div style="font-size:12px;color:var(--muted2);margin-bottom:8px;font-weight:600;">שם הארוחה</div>
+        <input id="mealNameInput" type="text" placeholder="למשל: ארוחת בוקר, צלחת יוגורט, ארוחת ערב..."
+          style="width:100%;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:10px 14px;font-family:Heebo,sans-serif;font-size:14px;color:var(--text);outline:none;" />
+        <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;" id="mealNameSuggestions">
+          <button onclick="setMealName(this)" style="background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:100px;padding:4px 12px;font-family:Heebo,sans-serif;font-size:12px;color:var(--muted2);cursor:pointer;">ארוחת בוקר</button>
+          <button onclick="setMealName(this)" style="background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:100px;padding:4px 12px;font-family:Heebo,sans-serif;font-size:12px;color:var(--muted2);cursor:pointer;">ארוחת צהריים</button>
+          <button onclick="setMealName(this)" style="background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:100px;padding:4px 12px;font-family:Heebo,sans-serif;font-size:12px;color:var(--muted2);cursor:pointer;">ארוחת ערב</button>
+          <button onclick="setMealName(this)" style="background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:100px;padding:4px 12px;font-family:Heebo,sans-serif;font-size:12px;color:var(--muted2);cursor:pointer;">חטיף</button>
+          <button onclick="setMealName(this)" style="background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:100px;padding:4px 12px;font-family:Heebo,sans-serif;font-size:12px;color:var(--muted2);cursor:pointer;">לפני אימון</button>
+          <button onclick="setMealName(this)" style="background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:100px;padding:4px 12px;font-family:Heebo,sans-serif;font-size:12px;color:var(--muted2);cursor:pointer;">צלחת יוגורט</button>
+          <button onclick="setMealName(this)" style="background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:100px;padding:4px 12px;font-family:Heebo,sans-serif;font-size:12px;color:var(--muted2);cursor:pointer;">ארוחת בוקר אחרי ספורט</button>
+        </div>
+      </div>
+
+      <!-- Product Search -->
+      <div style="padding:14px 20px;border-bottom:1px solid rgba(255,255,255,0.07);">
+        <div style="font-size:12px;color:var(--muted2);margin-bottom:8px;font-weight:600;">🔍 חפש מוצר — סופרים ישראלים + עולמי</div>
+        <div style="display:flex;gap:8px;">
+          <input id="productSearch" type="text" placeholder="למשל: גרנולה תלמה, יוגורט טרה, בננה..."
+            style="flex:1;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:10px 14px;font-family:Heebo,sans-serif;font-size:14px;color:var(--text);outline:none;"
+            onkeydown="if(event.key==='Enter') searchProduct()" />
+          <button onclick="searchProduct()" style="background:var(--gold);color:#000;border:none;border-radius:10px;padding:10px 16px;font-family:Heebo,sans-serif;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap;">חפש</button>
+        </div>
+        <!-- Quick add common items -->
+        <div style="margin-top:10px;">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:6px;">הוסף ידנית (מוצרים ללא ברקוד):</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;" id="quickAddBtns">
+            <button onclick="quickAdd('יוגורט 3%',150,90,8,10,3,'כוס (150g)')" style="background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:8px;padding:5px 10px;font-family:Heebo,sans-serif;font-size:11px;color:var(--muted2);cursor:pointer;">🥛 יוגורט</button>
+            <button onclick="quickAdd('בננה',120,105,1,27,0,'יחידה')" style="background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:8px;padding:5px 10px;font-family:Heebo,sans-serif;font-size:11px;color:var(--muted2);cursor:pointer;">🍌 בננה</button>
+            <button onclick="quickAdd('תפוח',180,95,0,25,0,'יחידה')" style="background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:8px;padding:5px 10px;font-family:Heebo,sans-serif;font-size:11px;color:var(--muted2);cursor:pointer;">🍎 תפוח</button>
+            <button onclick="quickAdd('אגס',150,100,1,26,0,'יחידה')" style="background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:8px;padding:5px 10px;font-family:Heebo,sans-serif;font-size:11px;color:var(--muted2);cursor:pointer;">🍐 אגס</button>
+            <button onclick="quickAdd('ביצה',60,70,6,0,5,'יחידה')" style="background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:8px;padding:5px 10px;font-family:Heebo,sans-serif;font-size:11px;color:var(--muted2);cursor:pointer;">🥚 ביצה</button>
+            <button onclick="quickAdd('גרנולה',30,130,3,22,5,'כף גדושה (30g)')" style="background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:8px;padding:5px 10px;font-family:Heebo,sans-serif;font-size:11px;color:var(--muted2);cursor:pointer;">🌾 גרנולה</button>
+            <button onclick="quickAdd('סילן',15,45,0,12,0,'חצי כף')" style="background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:8px;padding:5px 10px;font-family:Heebo,sans-serif;font-size:11px;color:var(--muted2);cursor:pointer;">🍯 סילן</button>
+            <button onclick="quickAdd('שיבולת שועל',60,230,8,40,4,'60g')" style="background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:8px;padding:5px 10px;font-family:Heebo,sans-serif;font-size:11px;color:var(--muted2);cursor:pointer;">🥣 שיבולת שועל</button>
+            <button onclick="quickAdd('חלב 3%',200,120,7,10,7,'200ml')" style="background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:8px;padding:5px 10px;font-family:Heebo,sans-serif;font-size:11px;color:var(--muted2);cursor:pointer;">🥛 חלב</button>
+            <button onclick="quickAdd('שקדים',25,145,5,5,13,'חופן (25g)')" style="background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:8px;padding:5px 10px;font-family:Heebo,sans-serif;font-size:11px;color:var(--muted2);cursor:pointer;">🌰 שקדים</button>
+          </div>
+        </div>
+        <div id="searchResults" style="margin-top:10px;"></div>
+        <div id="searchSpinner" style="display:none;text-align:center;padding:16px;color:var(--muted2);font-size:13px;">🔍 מחפש מוצרים...</div>
+      </div>
+
+      <!-- Current Meal Items -->
+      <div style="padding:14px 20px;border-bottom:1px solid rgba(255,255,255,0.07);">
+        <div style="font-size:12px;color:var(--muted2);margin-bottom:8px;font-weight:600;">מרכיבי הארוחה</div>
+        <div id="currentMealItems" style="display:flex;flex-direction:column;gap:6px;min-height:40px;">
+          <div style="font-size:13px;color:var(--muted);text-align:center;padding:12px;">עדיין לא הוספת מוצרים — חפש למעלה</div>
+        </div>
+        <!-- Running total -->
+        <div id="mealRunTotal" style="display:none;margin-top:12px;background:rgba(245,166,35,0.06);border:1px solid rgba(245,166,35,0.2);border-radius:10px;padding:10px 14px;display:flex;gap:16px;flex-wrap:wrap;">
+          <div><span style="font-size:10px;color:var(--muted2);">סה"כ קל׳</span><br><span id="mrt_cal" style="font-size:18px;font-weight:900;color:var(--gold);">0</span></div>
+          <div><span style="font-size:10px;color:var(--muted2);">חלבון</span><br><span id="mrt_prot" style="font-size:18px;font-weight:900;color:var(--purple);">0g</span></div>
+          <div><span style="font-size:10px;color:var(--muted2);">פחמימה</span><br><span id="mrt_carb" style="font-size:18px;font-weight:900;color:var(--blue);">0g</span></div>
+          <div><span style="font-size:10px;color:var(--muted2);">שומן</span><br><span id="mrt_fat" style="font-size:18px;font-weight:900;color:var(--green);">0g</span></div>
+        </div>
+      </div>
+
+      <!-- Save Button -->
+      <div style="padding:14px 20px;display:flex;gap:8px;justify-content:flex-end;">
+        <button onclick="closeAddMeal()" style="background:rgba(255,255,255,0.06);border:1px solid var(--border);color:var(--muted2);border-radius:10px;padding:10px 18px;font-family:Heebo,sans-serif;font-size:14px;cursor:pointer;">ביטול</button>
+        <button onclick="saveMealToLog()" style="background:linear-gradient(135deg,#e8834a,#f5a623);color:#000;border:none;border-radius:10px;padding:10px 24px;font-family:Heebo,sans-serif;font-size:14px;font-weight:700;cursor:pointer;">✓ שמור — אכלתי!</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- QUANTITY MODAL -->
+  <div id="qtyModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:700;display:none;align-items:center;justify-content:center;padding:16px;">
+    <div style="background:#1a2538;border:1px solid rgba(255,255,255,0.15);border-radius:18px;padding:24px;max-width:360px;width:100%;">
+      <div id="qtyProductName" style="font-size:16px;font-weight:700;margin-bottom:4px;"></div>
+      <div id="qtyProductMeta" style="font-size:12px;color:var(--muted2);margin-bottom:16px;"></div>
+      
+      <div style="font-size:12px;color:var(--muted2);margin-bottom:8px;">כמות / מנה</div>
+      <div style="display:flex;gap:8px;margin-bottom:12px;">
+        <input id="qtyAmount" type="number" value="1" min="0.1" step="0.5"
+          style="width:80px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:8px;padding:10px;font-family:Heebo,sans-serif;font-size:18px;font-weight:700;color:var(--text);text-align:center;outline:none;"
+          oninput="updateQtyPreview()" />
+        <select id="qtyUnit" onchange="updateQtyPreview()"
+          style="flex:1;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:8px;padding:10px;font-family:Heebo,sans-serif;font-size:14px;color:var(--text);outline:none;">
+          <option value="serving">מנה (100g)</option>
+          <option value="g">גרם</option>
+          <option value="ml">מ"ל</option>
+          <option value="unit">יחידה</option>
+          <option value="cup">כוס (240ml)</option>
+          <option value="tbsp">כף (15g)</option>
+          <option value="tsp">כפית (5g)</option>
+          <option value="handful">חופן (~30g)</option>
+        </select>
+      </div>
+
+      <!-- Quick amounts -->
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">
+        <button onclick="setQty(0.5,'serving')" style="background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-family:Heebo,sans-serif;font-size:11px;color:var(--muted2);cursor:pointer;">חצי מנה</button>
+        <button onclick="setQty(1,'serving')" style="background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-family:Heebo,sans-serif;font-size:11px;color:var(--muted2);cursor:pointer;">מנה</button>
+        <button onclick="setQty(1,'unit')" style="background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-family:Heebo,sans-serif;font-size:11px;color:var(--muted2);cursor:pointer;">יחידה</button>
+        <button onclick="setQty(1,'cup')" style="background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-family:Heebo,sans-serif;font-size:11px;color:var(--muted2);cursor:pointer;">כוס</button>
+        <button onclick="setQty(1,'tbsp')" style="background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-family:Heebo,sans-serif;font-size:11px;color:var(--muted2);cursor:pointer;">כף</button>
+        <button onclick="setQty(150,'g')" style="background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-family:Heebo,sans-serif;font-size:11px;color:var(--muted2);cursor:pointer;">150g</button>
+        <button onclick="setQty(200,'g')" style="background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-family:Heebo,sans-serif;font-size:11px;color:var(--muted2);cursor:pointer;">200g</button>
+      </div>
+
+      <div id="qtyPreview" style="background:rgba(245,166,35,0.08);border:1px solid rgba(245,166,35,0.2);border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:14px;"></div>
+      
+      <div style="display:flex;gap:8px;">
+        <button onclick="closeQty()" style="flex:1;background:rgba(255,255,255,0.06);border:1px solid var(--border);color:var(--muted2);border-radius:10px;padding:10px;font-family:Heebo,sans-serif;font-size:14px;cursor:pointer;">ביטול</button>
+        <button onclick="confirmAddProduct()" style="flex:2;background:linear-gradient(135deg,#e8834a,#f5a623);color:#000;border:none;border-radius:10px;padding:10px;font-family:Heebo,sans-serif;font-size:14px;font-weight:700;cursor:pointer;">+ הוסף לארוחה</button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- ===== PUSH SETTINGS ===== -->
+<div class="section" id="pushsettings">
+  <div class="sec-title">הגדרות התראות 🔔</div>
+  <div class="sec-sub">הגדר מתי תקבל Push Notifications — עובד גם כשהאפליקציה סגורה</div>
+
+  <!-- Permission Status -->
+  <div id="pushPermissionBanner" style="background:rgba(245,166,35,0.08);border:1px solid rgba(245,166,35,0.3);border-radius:14px;padding:16px 20px;margin-bottom:16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+    <div style="font-size:28px;">🔔</div>
+    <div style="flex:1;">
+      <div id="pushStatusText" style="font-weight:700;font-size:15px;">טוען סטטוס...</div>
+      <div id="pushStatusSub" style="font-size:12px;color:var(--muted2);margin-top:2px;"></div>
+    </div>
+    <button id="pushEnableBtn" onclick="requestPushPermission()" style="background:linear-gradient(135deg,#e8834a,#f5a623);color:#000;border:none;border-radius:10px;padding:10px 20px;font-family:Heebo,sans-serif;font-size:14px;font-weight:700;cursor:pointer;display:none;">הפעל התראות</button>
+  </div>
+
+  <!-- Schedule Builder -->
+  <div id="scheduleBuilder" style="display:none;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <div style="font-size:16px;font-weight:700;">לוח זמנים</div>
+      <button onclick="addNotifRule()" style="background:rgba(245,166,35,0.12);border:1px solid rgba(245,166,35,0.3);color:var(--gold);border-radius:8px;padding:7px 16px;font-family:Heebo,sans-serif;font-size:13px;font-weight:600;cursor:pointer;">+ הוסף התראה</button>
+    </div>
+
+    <!-- Default rules -->
+    <div id="notifRulesList" style="display:flex;flex-direction:column;gap:10px;"></div>
+
+    <!-- Save button -->
+    <button onclick="saveNotifSchedule()" style="width:100%;margin-top:16px;background:linear-gradient(135deg,#e8834a,#f5a623);color:#000;border:none;border-radius:12px;padding:14px;font-family:Heebo,sans-serif;font-size:15px;font-weight:700;cursor:pointer;">💾 שמור הגדרות</button>
+
+    <div class="info-box" style="margin-top:16px;">
+      <strong>⚙️ איך זה עובד:</strong> האפליקציה מפעילה Service Worker שרץ ברקע ושולח התראות בשעות שהגדרת — גם כשהאפליקציה סגורה לחלוטין.
+    </div>
+  </div>
+
+  <!-- ADD RULE MODAL -->
+  <div id="addRuleModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:600;overflow-y:auto;padding:16px 8px;">
+    <div style="background:#161b27;border:1px solid rgba(255,255,255,0.12);border-radius:20px;max-width:480px;margin:0 auto;overflow:hidden;">
+      <div style="padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.07);display:flex;justify-content:space-between;align-items:center;">
+        <div style="font-size:17px;font-weight:800;" id="ruleModalTitle">➕ התראה חדשה</div>
+        <button onclick="closeRuleModal()" style="background:rgba(255,255,255,0.08);border:none;color:var(--text);border-radius:8px;padding:7px 14px;font-family:Heebo,sans-serif;font-size:13px;cursor:pointer;">✕</button>
+      </div>
+      <div style="padding:18px 20px;display:flex;flex-direction:column;gap:14px;">
+
+        <!-- Type -->
+        <div>
+          <label style="font-size:12px;color:var(--muted2);font-weight:600;display:block;margin-bottom:6px;">סוג התראה</label>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;" id="ruleTypeButtons">
+            <button class="rule-type-btn active" data-type="meal" onclick="selectRuleType(this)">🍽️ ארוחה</button>
+            <button class="rule-type-btn" data-type="workout" onclick="selectRuleType(this)">💪 אימון</button>
+            <button class="rule-type-btn" data-type="water" onclick="selectRuleType(this)">💧 מים</button>
+            <button class="rule-type-btn" data-type="weight" onclick="selectRuleType(this)">⚖️ שקילה</button>
+            <button class="rule-type-btn" data-type="custom" onclick="selectRuleType(this)">✏️ מותאם</button>
+          </div>
+        </div>
+
+        <!-- Title -->
+        <div>
+          <label style="font-size:12px;color:var(--muted2);font-weight:600;display:block;margin-bottom:6px;">כותרת ההתראה</label>
+          <input id="ruleTitle" type="text" placeholder="למשל: זמן ארוחה 1!"
+            style="width:100%;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:10px 14px;font-family:Heebo,sans-serif;font-size:14px;color:var(--text);outline:none;" />
+        </div>
+
+        <!-- Body -->
+        <div>
+          <label style="font-size:12px;color:var(--muted2);font-weight:600;display:block;margin-bottom:6px;">תוכן ההתראה</label>
+          <input id="ruleBody" type="text" placeholder="למשל: 3 ביצים + לחם מלא + ירק | ~540 קל'"
+            style="width:100%;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:10px 14px;font-family:Heebo,sans-serif;font-size:14px;color:var(--text);outline:none;" />
+        </div>
+
+        <!-- Time -->
+        <div>
+          <label style="font-size:12px;color:var(--muted2);font-weight:600;display:block;margin-bottom:6px;">שעה</label>
+          <input id="ruleTime" type="time" value="08:30"
+            style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:10px 14px;font-family:Heebo,sans-serif;font-size:18px;font-weight:700;color:var(--text);outline:none;" />
+        </div>
+
+        <!-- Days -->
+        <div>
+          <label style="font-size:12px;color:var(--muted2);font-weight:600;display:block;margin-bottom:8px;">ימים בשבוע</label>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button class="rule-day-btn active" data-day="0" onclick="toggleRuleDay(this)">א׳</button>
+            <button class="rule-day-btn active" data-day="1" onclick="toggleRuleDay(this)">ב׳</button>
+            <button class="rule-day-btn active" data-day="2" onclick="toggleRuleDay(this)">ג׳</button>
+            <button class="rule-day-btn active" data-day="3" onclick="toggleRuleDay(this)">ד׳</button>
+            <button class="rule-day-btn active" data-day="4" onclick="toggleRuleDay(this)">ה׳</button>
+            <button class="rule-day-btn active" data-day="5" onclick="toggleRuleDay(this)">ו׳</button>
+            <button class="rule-day-btn active" data-day="6" onclick="toggleRuleDay(this)">ש׳</button>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:8px;">
+            <button onclick="selectAllDays(true)" style="background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-family:Heebo,sans-serif;font-size:11px;color:var(--muted2);cursor:pointer;">כל הימים</button>
+            <button onclick="selectWorkoutDays()" style="background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-family:Heebo,sans-serif;font-size:11px;color:var(--muted2);cursor:pointer;">ימי אימון בלבד</button>
+            <button onclick="selectAllDays(false)" style="background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-family:Heebo,sans-serif;font-size:11px;color:var(--muted2);cursor:pointer;">נקה הכל</button>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px;margin-top:4px;">
+          <button id="ruleDeleteBtn" style="display:none;background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.25);color:var(--red);border-radius:10px;padding:10px 16px;font-family:Heebo,sans-serif;font-size:14px;cursor:pointer;" onclick="deleteCurrentRule()">🗑 מחק</button>
+          <button onclick="closeRuleModal()" style="flex:1;background:rgba(255,255,255,0.06);border:1px solid var(--border);color:var(--muted2);border-radius:10px;padding:10px;font-family:Heebo,sans-serif;font-size:14px;cursor:pointer;">ביטול</button>
+          <button onclick="saveRule()" style="flex:2;background:linear-gradient(135deg,#e8834a,#f5a623);color:#000;border:none;border-radius:10px;padding:10px;font-family:Heebo,sans-serif;font-size:14px;font-weight:700;cursor:pointer;">שמור ✓</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- ===== WATER ===== -->
+<div class="section" id="water">
+  <div class="sec-title">מעקב שתיית מים 💧</div>
+  <div class="sec-sub">100 ק"ג = 10–12 כוסות ביום (250 מ"ל כל כוס)</div>
+
+  <div class="warn-box">
+    <strong>למה 10–12 ולא 8?</strong> במשקל 100 ק"ג הגוף צורך יותר מים. שתייה מספקת מאיצה חילוף חומרים ב-30%, מפחיתה תיאבון, ומונעת כאבי ראש ועייפות.
+  </div>
+
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:22px;margin-bottom:16px;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+      <div style="font-size:28px;">💧</div>
+      <div>
+        <div style="font-size:16px;font-weight:700;">מד מים — היום</div>
+        <div style="font-size:13px;color:var(--muted2);">לחץ על כוס להוספה</div>
+      </div>
+      <div style="margin-right:auto;font-size:22px;font-weight:900;color:var(--blue);" id="waterCountDisplay">0 / 10</div>
+    </div>
+    <div class="water-cups" id="waterCups">
+    </div>
+    <div style="margin-top:14px;">
+      <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted2);margin-bottom:6px;">
+        <span>0</span><span>מינימום: 10 כוסות</span>
+      </div>
+      <div style="height:8px;background:rgba(255,255,255,0.06);border-radius:100px;overflow:hidden;">
+        <div id="waterBar" style="height:100%;background:linear-gradient(90deg,#3b82f6,#60a5fa);border-radius:100px;width:0%;transition:width 0.4s;"></div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;">
+      <button onclick="addWater()" style="background:rgba(96,165,250,0.12);border:1px solid rgba(96,165,250,0.3);color:var(--blue);border-radius:8px;padding:8px 16px;font-family:'Heebo',sans-serif;font-size:13px;font-weight:600;cursor:pointer;">+ כוס מים</button>
+      <button onclick="resetWater()" style="background:rgba(255,255,255,0.04);border:1px solid var(--border2);color:var(--muted2);border-radius:8px;padding:8px 16px;font-family:'Heebo',sans-serif;font-size:13px;cursor:pointer;">אפס</button>
+    </div>
+  </div>
+
+  <!-- לוח זמני שתייה -->
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;margin-bottom:16px;">
+    <div style="font-size:16px;font-weight:700;margin-bottom:14px;">📅 תזמון מומלץ</div>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <div style="display:flex;align-items:center;gap:12px;"><span style="color:var(--gold);font-weight:700;width:50px;">06:30</span><span style="font-size:13px;">כוס מים על קיבה ריקה — לפני הכל</span></div>
+      <div style="display:flex;align-items:center;gap:12px;"><span style="color:var(--gold);font-weight:700;width:50px;">08:00</span><span style="font-size:13px;">כוס לפני ארוחת בוקר</span></div>
+      <div style="display:flex;align-items:center;gap:12px;"><span style="color:var(--gold);font-weight:700;width:50px;">10:30</span><span style="font-size:13px;">2 כוסות — אמצע בוקר</span></div>
+      <div style="display:flex;align-items:center;gap:12px;"><span style="color:var(--gold);font-weight:700;width:50px;">13:30</span><span style="font-size:13px;">כוס לפני ארוחת צהריים</span></div>
+      <div style="display:flex;align-items:center;gap:12px;"><span style="color:var(--gold);font-weight:700;width:50px;">15:30</span><span style="font-size:13px;">2 כוסות — אחר הצהריים</span></div>
+      <div style="display:flex;align-items:center;gap:12px;"><span style="color:var(--gold);font-weight:700;width:50px;">18:00</span><span style="font-size:13px;">כוס — ערב מוקדם</span></div>
+      <div style="display:flex;align-items:center;gap:12px;"><span style="color:var(--gold);font-weight:700;width:50px;">20:00</span><span style="font-size:13px;">כוס</span></div>
+      <div style="display:flex;align-items:center;gap:12px;"><span style="color:var(--gold);font-weight:700;width:50px;">22:00</span><span style="font-size:13px;">כוס לפני שינה</span></div>
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-top:12px;">🏃 ביום אימון: + 2 כוסות נוספות (לפני + אחרי אימון)</div>
+  </div>
+</div>
+
+<!-- ===== PROGRESS ===== -->
+<div class="section" id="progress">
+  <div class="sec-title">מעקב התקדמות</div>
+  <div class="sec-sub">עדכן פעם בשבוע — בוקר, לפני אוכל</div>
+
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:22px;margin-bottom:16px;">
+    <div style="font-size:16px;font-weight:700;margin-bottom:14px;">⚖️ עדכון משקל</div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+      <input type="number" id="weightInput" placeholder="100" min="60" max="150" step="0.1"
+        style="background:rgba(255,255,255,0.06);border:1px solid var(--border2);border-radius:8px;padding:10px 14px;font-family:'Heebo',sans-serif;font-size:18px;font-weight:700;color:var(--text);width:120px;text-align:center;">
+      <span style="font-size:16px;color:var(--muted2);">ק"ג</span>
+      <button onclick="updateWeight()" style="background:linear-gradient(135deg,var(--gold2),var(--gold));color:#000;border:none;border-radius:8px;padding:10px 20px;font-family:'Heebo',sans-serif;font-size:14px;font-weight:700;cursor:pointer;">עדכן</button>
+    </div>
+    <div id="weightFeedback" style="margin-top:12px;font-size:13px;color:var(--muted2);"></div>
+  </div>
+
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:22px;margin-bottom:16px;" id="weightHistory">
+    <div style="font-size:16px;font-weight:700;margin-bottom:14px;">📊 היסטוריית משקל</div>
+    <div id="weightList" style="font-size:13px;color:var(--muted2);">עוד לא עדכנת משקל. לחץ "עדכן" למעלה.</div>
+  </div>
+
+  <!-- Phases -->
+  <div class="sec-title" style="font-size:18px;margin-bottom:6px;margin-top:8px;">📈 מפת הדרך</div>
+  <div class="phase-timeline">
+    <div class="phase-card">
+      <div class="phase-num">שלב 1 · שבועות 1–4</div>
+      <div class="phase-title">🌱 הנחת הבסיס</div>
+      <div class="phase-desc">2 אימונים + 2 הליכות בשבוע. גוף מתרגל. ציפייה: -1 עד -2 ק"ג בשלב הזה. אל תתאכזב אם פחות — זה נורמלי לגמרי.</div>
+    </div>
+    <div class="phase-card">
+      <div class="phase-num">שלב 2 · שבועות 5–10</div>
+      <div class="phase-title">🔥 בניית מומנטום</div>
+      <div class="phase-desc">מוסיפים אימון שלישי. הליכה עולה. ציפייה: -0.5 עד -1 ק"ג בשבוע. בגדים מתחילים להרגיש שונה — זה הסימן האמיתי.</div>
+    </div>
+    <div class="phase-card">
+      <div class="phase-num">שלב 3 · חודש 3–5</div>
+      <div class="phase-title">⚡ שינוי ממשי</div>
+      <div class="phase-desc">גוף חדש מתגבש. מוסיפים interval. ציפייה: -8 עד -10 ק"ג מההתחלה. המסגרת הפכה הרגל.</div>
+    </div>
+    <div class="phase-card">
+      <div class="phase-num">שלב 4 · חודש 6–9</div>
+      <div class="phase-title">🎯 גמר — 80 ק"ג</div>
+      <div class="phase-desc">בשלב הזה כבר ספורטאי אמיתי. המטרה במגרש. חיטוב, ייצוב, שמירה. זה לא סוף — זה ההתחלה של השלב הבא.</div>
+    </div>
+  </div>
+
+  <div class="info-box" style="margin-top:16px;">
+    <strong>💡 ציפיות ריאליות:</strong> חודש 1 — ייתכן עלייה קלה (שריר). חודש 2 — ירידה ראשונה ניכרת. חודש 3 — שינוי צורה לפני שינוי מספר. <strong>אל תשקל כל יום.</strong>
+  </div>
+</div>
+
+
+<!-- ═══ ALCOHOL ═══ -->
+<div class="section" id="alcohol">
+  <div class="sec-title">מעקב שתייה 🍺</div>
+  <div class="sec-sub">תיעוד יומי · יחידות · קלוריות</div>
+  <div class="warn-box"><strong>💡</strong> אלכוהול מוסיף קלוריות חבויות ומפריע לשינה ולשריפת שומן. תיעוד עוזר לראות דפוסים.</div>
+  <div id="alcoholContent"></div>
+</div>
+
+<!-- ===== RULES ===== -->
+<div class="section" id="rules">
+  <div class="sec-title">כללי הזהב</div>
+  <div class="sec-sub">ריאלי, שפוי, עקבי — זה הנוסחה</div>
+
+  <div class="rules-grid">
+    <div class="rule-card"><div class="rule-icon">🧠</div><div class="rule-title">נפש קודם הכל</div><div class="rule-text">יום רע? דילגת על אימון? אכלת ג׳אנק? זה בסדר. חוזרים מחר. אין כישלון — רק עצירה זמנית.</div></div>
+    <div class="rule-card"><div class="rule-icon">😴</div><div class="rule-title">שינה = הנשק הסודי</div><div class="rule-text">7–8 שעות. חסר שינה = רעב יותר + שריר לא מתאושש + פחות כוח לאימון. זה חשוב כמו אוכל.</div></div>
+    <div class="rule-card"><div class="rule-icon">🚬</div><div class="rule-title">סיגריות — הדרגתי</div><div class="rule-text">לא לנסות להפסיק בבת אחת. צמצם ל-50% תוך חודש. הריצה תעזור מאוד — ריאות שמרגישות טוב רוצות פחות עשן.</div></div>
+    <div class="rule-card"><div class="rule-icon">🍺</div><div class="rule-title">אלכוהול — פחות, לא אפס</div><div class="rule-text">הגבל ל-2–3 פעמים בשבוע. כוס מים בין כל שתייה. אל תשתה על קיבה ריקה. יין אדום עדיף על בירה.</div></div>
+    <div class="rule-card"><div class="rule-icon">🥩</div><div class="rule-title">בשר — כן ובגדול</div><div class="rule-text">בשר הוא חלבון מעולה. בקר רזה, עוף, דגים לבנים, טונה — כל אלה חלק מרכזי בתפריט. לא צריך להפסיק.</div></div>
+    <div class="rule-card"><div class="rule-icon">📉</div><div class="rule-title">מאזן קלורי — לא סבל</div><div class="rule-text">גירעון של 400–500 קל׳ ביום = ירידה בריאה. לא צריך לרעוב. לאכול טוב ופחות זבל = מספיק.</div></div>
+    <div class="rule-card"><div class="rule-icon">🦵</div><div class="rule-title">ברכיים וגב — כבד אותם</div><div class="rule-text">כאב חד = עצור. כאב שרירי = המשך. מתיחות אחרי כל אימון. עם 100 ק"ג — הגוף עובד קשה.</div></div>
+    <div class="rule-card"><div class="rule-icon">📸</div><div class="rule-title">תצלם תמונות</div><div class="rule-text">כל 2–3 שבועות. השינוי נראה בתמונות הרבה לפני שהמשקל מראה אותו. זה הכי מוטיבציה.</div></div>
+    <div class="rule-card"><div class="rule-icon">🎯</div><div class="rule-title">70% = הצלחה</div><div class="rule-text">לא צריך להיות מושלם. 70% מהזמן בסדר = תוצאות אמיתיות. עקביות > שלמות.</div></div>
+    <div class="rule-card"><div class="rule-icon">🚫</div><div class="rule-title">מה להפחית</div><div class="rule-text">שתייה מתוקה (קולה, מיצים קנויים), מטוגן עמוק, ממתקים יומיומיים. לא אסור — רק לא כל יום.</div></div>
+  </div>
+</div>
+
+<!-- Toast -->
+
+<!-- ═══ BOTTOM NAV ═══ -->
+<nav class="bottom-nav">
+  <button class="bnav-btn active" data-tab="today" onclick="goTab('today',this)">
+    <span class="bnav-icon">📋</span><span class="bnav-label">היום</span>
+  </button>
+  <button class="bnav-btn" data-tab="training" onclick="goTab('training',this)">
+    <span class="bnav-icon">💪</span><span class="bnav-label">אימון</span>
+  </button>
+  <div class="bnav-fab-space"></div>
+  <button class="bnav-btn" data-tab="food" onclick="goTab('food',this)">
+    <span class="bnav-icon">🍽️</span><span class="bnav-label">תזונה</span>
+  </button>
+  <button class="bnav-btn" data-tab="dashboard" onclick="goTab('dashboard',this)">
+    <span class="bnav-icon">📊</span><span class="bnav-label">דאשבורד</span>
+  </button>
+</nav>
+
+<!-- ═══ FAB ═══ -->
+<div class="fab-overlay" id="fabOverlay" onclick="closeFab()"></div>
+<div class="fab-menu" id="fabMenu">
+  <div class="fab-item" onclick="closeFab();window.food&&window.food.openAddMeal?window.food.openAddMeal():openAddMeal()">
+    <span class="fab-item-txt">+ הוסף ארוחה</span>
+    <span class="fab-item-ico" style="background:linear-gradient(135deg,#e8834a,#f5a623);color:#000;font-size:22px;font-weight:700;">+</span>
+  </div>
+  <div class="fab-item" onclick="closeFab();goTab('training',null)">
+    <span class="fab-item-txt">💪 התחל אימון</span>
+    <span class="fab-item-ico" style="background:linear-gradient(135deg,#e8834a,#f5a623);color:#000;font-weight:700;">▶</span>
+  </div>
+  <div class="fab-item" onclick="closeFab();addWaterCup()">
+    <span class="fab-item-txt">💧 + כוס מים</span>
+    <span class="fab-item-ico" style="background:rgba(96,165,250,0.2);">💧</span>
+  </div>
+  <div class="fab-item" onclick="closeFab();goTab('water',null)">
+    <span class="fab-item-txt">💧 מעקב מים</span><span class="fab-item-ico">💧</span>
+  </div>
+  <div class="fab-item" onclick="closeFab();goTab('alcohol',null)">
+    <span class="fab-item-txt">🍺 שתייה</span>
+    <span class="fab-item-ico" style="background:rgba(251,146,60,0.15);">🍺</span>
+  </div>
+  <div class="fab-item" onclick="closeFab();goTab('calendar',null)">
+    <span class="fab-item-txt">📅 לוח שנה</span><span class="fab-item-ico">📅</span>
+  </div>
+  <div class="fab-item" onclick="closeFab();goTab('progress',null)">
+    <span class="fab-item-txt">⚖️ מעקב משקל</span><span class="fab-item-ico">⚖️</span>
+  </div>
+  <div class="fab-item" onclick="closeFab();goTab('achievements',null)">
+    <span class="fab-item-txt">🏆 הישגים</span><span class="fab-item-ico">🏆</span>
+  </div>
+  <div class="fab-item" onclick="closeFab();goTab('events',null)">
+    <span class="fab-item-txt">🎉 מצבים מיוחדים</span><span class="fab-item-ico">🎉</span>
+  </div>
+  <div class="fab-item" onclick="closeFab();goTab('pushsettings',null)">
+    <span class="fab-item-txt">🔔 התראות</span><span class="fab-item-ico">🔔</span>
+  </div>
+  <div class="fab-item" onclick="closeFab();goTab('rules',null)">
+    <span class="fab-item-txt">📌 כללים</span><span class="fab-item-ico">📌</span>
+  </div>
+</div>
+<button class="fab-btn" id="fabBtn" onclick="toggleFab()">+</button>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ====== STORAGE LAYER (Firebase + localStorage fallback) ======
+const STORAGE_KEY = 'yoavFitData_v2';
+
+function getLocalData() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch(e) { return {}; }
+}
+function setLocalData(data) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
+async function saveData(key, value) {
+  const local = getLocalData();
+  local[key] = value;
+  setLocalData(local);
+  if(window._firebaseConfigured && window._db) {
+    try {
+      const { doc, setDoc } = window._fbops;
+      await setDoc(doc(window._db, 'yoav', key), { value: JSON.stringify(value) });
+    } catch(e) {}
+  }
+}
+
+async function loadData(key, fallback) {
+  if(window._firebaseConfigured && window._db) {
+    try {
+      const { doc, getDoc } = window._fbops;
+      const snap = await getDoc(doc(window._db, 'yoav', key));
+      if(snap.exists()) return JSON.parse(snap.data().value);
+    } catch(e) {}
+  }
+  const local = getLocalData();
+  return local[key] !== undefined ? local[key] : fallback;
+}
+
+// ====== DEFAULT WORKOUTS ======
+const DEFAULT_WORKOUTS = [
+  {
+    id: 'w1', name: 'אימון א׳ — רגליים + גב + בטן', type: 'workout',
+    days: [1], duration: 40, notes: 'מנוחה 60–90 שנ׳ בין סטים',
+    exercises: [
+      {name:'סקוואט בגוף — Squat', sets:3, reps:10, note:'ברכיים לא עוברות אצבעות', yt:'https://youtube.com/watch?v=YaXPRqUwItQ'},
+      {name:'לאנג׳ במקום — Lunge', sets:3, reps:8, note:'כל רגל', yt:'https://youtube.com/watch?v=QOVaHwm-Q6U'},
+      {name:'גשר אגן — Glute Bridge', sets:3, reps:12, note:'מחזק גב תחתון', yt:'https://youtube.com/watch?v=wPM8icPu6H8'},
+      {name:'הרמת עקבים — Calf Raise', sets:3, reps:15, note:'', yt:'https://youtube.com/watch?v=-M4-G8p1fCI'},
+      {name:'פלאנק — Plank', sets:3, reps:'20 שנ׳', note:'גב ישר, בטן מכווצת', yt:'https://youtube.com/watch?v=pSHjTRCQxIw'},
+      {name:'מתיחות ארבע ראשי + ירך', sets:2, reps:'30 שנ׳', note:'חובה!', yt:'https://youtube.com/watch?v=LqJDMESmGAA'},
+    ]
+  },
+  {
+    id: 'w2', name: 'אימון ב׳ — פלג עליון + בטן + צוואר', type: 'workout',
+    days: [4], duration: 40, notes: 'מנוחה 60–90 שנ׳ בין סטים',
+    exercises: [
+      {name:'שכיבות סמיכה — Push-Up', sets:3, reps:8, note:'על ברכיים אם קשה', yt:'https://youtube.com/watch?v=IODxDxX7oi4'},
+      {name:'Dips על ספסל', sets:3, reps:8, note:'ירידה איטית', yt:'https://youtube.com/watch?v=6kALZikXxLc'},
+      {name:'Superman — גב עליון', sets:3, reps:10, note:'החזק 2 שנ׳', yt:'https://youtube.com/watch?v=cc6UVRS7PW4'},
+      {name:'קראנץ׳ — Crunch', sets:3, reps:12, note:'בטן עובדת, לא צוואר', yt:'https://youtube.com/watch?v=Xyd_fa5zoEU'},
+      {name:'Mountain Climbers', sets:3, reps:'20 שנ׳', note:'קצב מתון', yt:'https://youtube.com/watch?v=nmwgirgXLYM'},
+      {name:'מתיחות צוואר', sets:4, reps:'20 שנ׳', note:'4 כיוונים', yt:'https://youtube.com/watch?v=kYAhQ2HKhJY'},
+    ]
+  },
+  {
+    id: 'w3', name: 'הליכה', type: 'walk',
+    days: [0, 3], duration: 30, notes: 'גב ישר, קצב נוח, כאב חד = עצור',
+    exercises: []
+  }
+];
+
+// ====== APP STATE ======
+let workouts = [];
+let editingWorkoutId = null;
+let waterCount = 0;
+let weights = [];
+let checks = {};
+let foodLog = {};
+let currentDayOffset = 0;
+let currentAddMealItems = [];
+let pendingProduct = null;
+const DAY_NAMES = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+const MONTH_NAMES = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
+
+// ====== INIT ======
+document.addEventListener('DOMContentLoaded', async () => {
+  // Date
+  const now = new Date();
+  const dateEl = document.getElementById('todayDate');
+  if(dateEl) dateEl.textContent = DAY_NAMES[now.getDay()] + ', ' + now.getDate() + ' ' + MONTH_NAMES[now.getMonth()] + ' ' + now.getFullYear();
+
+  // Load all data
+  workouts = await loadData('workouts', DEFAULT_WORKOUTS);
+  waterCount = await loadData('waterCount', 0);
+  weights = await loadData('weights', []);
+  checks = await loadData('checks_' + getDayKey(0), {});
+  foodLog = await loadData('foodLog', {});
+
+  renderWorkouts();
+  renderWaterCups();
+  renderWeights();
+  updateProgressBar(null);
+  restoreChecks();
+  updateScore();
+  setTimeout(() => { if(document.getElementById('mealsList')) renderFoodLog(); }, 100);
+
+  // PWA manifest
+  const manifest = {name:'יואב Fit',short_name:'Fit יואב',start_url:'.',display:'standalone',background_color:'#080c12',theme_color:'#080c12',icons:[{src:'https://raw.githubusercontent.com/twitter/twemoji/master/assets/72x72/1f3cb.png',sizes:'72x72',type:'image/png'}]};
+  const blob = new Blob([JSON.stringify(manifest)], {type:'application/json'});
+  document.getElementById('pwaManifest').href = URL.createObjectURL(blob);
+
+  // Firebase setup hint
+  setTimeout(showFirebaseHint, 2000);
+});
+
+function showFirebaseHint() {
+  if(!window._firebaseConfigured && !localStorage.getItem('fbHintDismissed')) {
+    const hint = document.createElement('div');
+    hint.style.cssText = 'position:fixed;bottom:70px;left:50%;transform:translateX(-50%);background:#1a2538;border:1px solid rgba(245,166,35,0.4);border-radius:12px;padding:12px 18px;font-size:12px;color:var(--text);z-index:9000;max-width:340px;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,0.4);';
+    hint.innerHTML = '🔥 <strong>Firebase לא מוגדר</strong> — המידע נשמר מקומית בדפדפן זה בלבד.<br><span style="color:var(--gold)">לחץ כאן להוראות הגדרת Firebase</span>';
+    hint.onclick = () => { showFirebaseSetup(); hint.remove(); };
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '✕';
+    closeBtn.style.cssText = 'position:absolute;top:6px;left:8px;background:none;border:none;color:var(--muted2);cursor:pointer;font-size:14px;';
+    closeBtn.onclick = (e) => { e.stopPropagation(); localStorage.setItem('fbHintDismissed','1'); hint.remove(); };
+    hint.appendChild(closeBtn);
+    document.body.appendChild(hint);
+    setTimeout(() => { if(hint.parentNode) hint.remove(); }, 8000);
+  }
+}
+
+function showFirebaseSetup() {
+  showToast('📋 ראה הוראות Firebase בתחתית הדף');
+}
+
+// ====== TABS ======
+function showTab(id, btn) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  if(btn) btn.classList.add('active');
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+// ====== WORKOUT RENDER ======
+function renderWorkouts() {
+  const dayIcons = ['🌅','💪','😴','🚶','💪','🌴','🧘'];
+  const dayTypes = {workout:'workout', walk:'walk', rest:'rest', cardio:'workout', stretch:'rest'};
+  
+  // Week display
+  const weekEl = document.getElementById('weekDisplay');
+  if(weekEl) {
+    const dayData = Array(7).fill(null).map(() => ({label:'מנוחה', icon:'😴', type:'rest'}));
+    workouts.forEach(w => {
+      w.days.forEach(d => {
+        const icon = w.type==='walk'?'🚶':w.type==='cardio'?'🏃':w.type==='stretch'?'🧘':'💪';
+        dayData[d] = {label: w.name.split('—')[0].trim().replace('אימון ','').substring(0,6), icon, type: dayTypes[w.type]||'workout'};
+      });
+    });
+    weekEl.innerHTML = dayData.map((d,i) => `
+      <div class="tw-day ${d.type}">
+        <div class="tw-day-name">${DAY_NAMES[i]}</div>
+        <div class="tw-day-icon">${d.icon}</div>
+        <div class="tw-day-label">${d.label}</div>
+      </div>`).join('');
+  }
+
+  // Workouts list
+  const listEl = document.getElementById('workoutsList');
+  if(!listEl) return;
+  listEl.innerHTML = workouts.map(w => `
+    <div class="tr-card" style="margin-bottom:14px;">
+      <div class="tr-card-head" style="justify-content:space-between;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div class="tr-icon">${w.type==='walk'?'🚶':w.type==='cardio'?'🏃':w.type==='stretch'?'🧘':'💪'}</div>
+          <div>
+            <div class="tr-title">${w.name}</div>
+            <div class="tr-meta">${w.days.map(d=>DAY_NAMES[d]).join(' + ')} | ${w.duration} דקות</div>
+          </div>
+        </div>
+        <button onclick="openWorkoutEditor('${w.id}')" style="background:rgba(245,166,35,0.1);border:1px solid rgba(245,166,35,0.25);color:var(--gold);border-radius:8px;padding:7px 14px;font-family:Heebo,sans-serif;font-size:12px;font-weight:600;cursor:pointer;flex-shrink:0;">✏️ ערוך</button>
+      </div>
+      <div class="tr-body">
+        ${w.exercises.length===0 ? '<div style="font-size:13px;color:var(--muted2);">אין תרגילים — לחץ ערוך להוספה</div>' :
+          w.exercises.map((ex,i) => `
+          <div class="ex-row">
+            <div class="ex-num">${i+1}</div>
+            <div class="ex-info">
+              <div class="ex-name">${ex.name}</div>
+              ${ex.note ? `<div class="ex-note">${ex.note}</div>` : ''}
+              ${ex.yt ? `<a class="ex-yt" href="${ex.yt}" target="_blank">▶ יוטיוב</a>` : ''}
+            </div>
+            <div class="ex-right">
+              <div class="ex-sets">${ex.sets} × ${ex.reps}</div>
+            </div>
+          </div>`).join('')}
+        ${w.notes ? `<div class="info-box" style="margin-top:10px;"><strong>💡</strong> ${w.notes}</div>` : ''}
+      </div>
+    </div>`).join('');
+}
+
+// ====== WORKOUT EDITOR ======
+function openWorkoutEditor(id) {
+  editingWorkoutId = id;
+  const w = id ? workouts.find(x=>x.id===id) : null;
+  
+  document.getElementById('editorTitle').textContent = id ? '✏️ עריכת אימון' : '➕ אימון חדש';
+  document.getElementById('weName').value = w ? w.name : '';
+  document.getElementById('weType').value = w ? w.type : 'workout';
+  document.getElementById('weDuration').value = w ? w.duration : 40;
+  document.getElementById('weNotes').value = w ? w.notes : '';
+  document.getElementById('weDeleteBtn').style.display = id ? 'block' : 'none';
+  
+  // Days
+  document.querySelectorAll('.day-toggle').forEach(btn => {
+    const day = parseInt(btn.dataset.day);
+    btn.classList.toggle('active', w ? w.days.includes(day) : false);
+  });
+  
+  // Exercises
+  const exContainer = document.getElementById('weExercises');
+  exContainer.innerHTML = '';
+  const exercises = w ? w.exercises : [];
+  exercises.forEach((ex, i) => addExerciseRow(ex));
+  
+  document.getElementById('workoutEditorModal').style.display = 'block';
+  document.body.style.overflow = 'hidden';
+}
+
+function closeWorkoutEditor() {
+  document.getElementById('workoutEditorModal').style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+function toggleDay(btn) {
+  btn.classList.toggle('active');
+}
+
+function addExerciseRow(ex) {
+  const container = document.getElementById('weExercises');
+  const idx = container.children.length;
+  const div = document.createElement('div');
+  div.style.cssText = 'background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:12px;';
+  div.innerHTML = `
+    <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;">
+      <input type="text" placeholder="שם התרגיל" value="${ex?ex.name:''}" data-field="name"
+        style="flex:1;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:8px 10px;font-family:Heebo,sans-serif;font-size:13px;color:var(--text);outline:none;" />
+      <button onclick="this.closest('div[style]').remove()" style="background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.2);color:var(--red);border-radius:7px;padding:6px 10px;font-family:Heebo,sans-serif;font-size:12px;cursor:pointer;flex-shrink:0;">✕</button>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span style="font-size:12px;color:var(--muted2);">סטים:</span>
+        <input type="number" value="${ex?ex.sets:3}" min="1" max="10" data-field="sets"
+          style="width:55px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:6px 8px;font-family:Heebo,sans-serif;font-size:13px;color:var(--text);text-align:center;outline:none;" />
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span style="font-size:12px;color:var(--muted2);">חזרות / זמן:</span>
+        <input type="text" value="${ex?ex.reps:10}" placeholder="10 / 30 שנ׳" data-field="reps"
+          style="width:80px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:6px 8px;font-family:Heebo,sans-serif;font-size:13px;color:var(--text);text-align:center;outline:none;" />
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:140px;">
+        <span style="font-size:12px;color:var(--muted2);">הערה:</span>
+        <input type="text" value="${ex?ex.note:''}" placeholder="טיפ קצר..." data-field="note"
+          style="flex:1;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:6px 8px;font-family:Heebo,sans-serif;font-size:13px;color:var(--text);outline:none;" />
+      </div>
+    </div>
+    <div style="margin-top:8px;display:flex;align-items:center;gap:6px;">
+      <span style="font-size:12px;color:var(--muted2);">קישור יוטיוב:</span>
+      <input type="url" value="${ex?ex.yt||'':''}" placeholder="https://youtube.com/watch?v=..." data-field="yt"
+        style="flex:1;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:6px 8px;font-family:Heebo,sans-serif;font-size:12px;color:var(--muted2);outline:none;" />
+    </div>`;
+  container.appendChild(div);
+}
+
+async function saveWorkout() {
+  const name = document.getElementById('weName').value.trim();
+  if(!name) { showToast('❌ הכנס שם לאימון'); return; }
+  
+  const days = [];
+  document.querySelectorAll('.day-toggle.active').forEach(btn => days.push(parseInt(btn.dataset.day)));
+  
+  const exercises = [];
+  document.querySelectorAll('#weExercises > div').forEach(row => {
+    const get = f => row.querySelector(`[data-field="${f}"]`)?.value?.trim() || '';
+    if(get('name')) exercises.push({name:get('name'), sets:parseInt(get('sets'))||3, reps:get('reps')||10, note:get('note'), yt:get('yt')});
+  });
+  
+  const workout = {
+    id: editingWorkoutId || 'w_' + Date.now(),
+    name, type: document.getElementById('weType').value,
+    days, duration: parseInt(document.getElementById('weDuration').value)||40,
+    notes: document.getElementById('weNotes').value.trim(),
+    exercises
+  };
+  
+  if(editingWorkoutId) {
+    workouts = workouts.map(w => w.id === editingWorkoutId ? workout : w);
+  } else {
+    workouts.push(workout);
+  }
+  
+  await saveData('workouts', workouts);
+  closeWorkoutEditor();
+  renderWorkouts();
+  showToast('✅ אימון נשמר!');
+}
+
+async function deleteWorkout() {
+  if(!editingWorkoutId) return;
+  if(!confirm('למחוק את האימון?')) return;
+  workouts = workouts.filter(w => w.id !== editingWorkoutId);
+  await saveData('workouts', workouts);
+  closeWorkoutEditor();
+  renderWorkouts();
+  showToast('🗑️ אימון נמחק');
+}
+
+// ====== WATER ======
+function renderWaterCups() {
+  const container = document.getElementById('waterCups');
+  if(!container) return;
+  container.innerHTML = '';
+  for(let i=0;i<12;i++) {
+    const cup = document.createElement('div');
+    cup.className = 'water-cup' + (i<waterCount?' filled':'');
+    cup.innerHTML = `<span>${i+1}</span>`;
+    cup.onclick = () => { waterCount=i+1; saveData('waterCount',waterCount); renderWaterCups(); if(waterCount>=10) showToast('🎉 הגעת ליעד המים!'); };
+    container.appendChild(cup);
+  }
+  updateWaterBar();
+}
+function addWater() { if(waterCount<12){waterCount++;saveData('waterCount',waterCount);renderWaterCups();if(waterCount>=10)showToast('🎉 יעד המים הושג!');} }
+function resetWater() { waterCount=0; saveData('waterCount',0); renderWaterCups(); }
+function updateWaterBar() {
+  const pct=Math.min((waterCount/10)*100,100);
+  const bar=document.getElementById('waterBar');
+  const disp=document.getElementById('waterCountDisplay');
+  if(bar) bar.style.width=pct+'%';
+  if(disp) disp.textContent=waterCount+' / 10';
+}
+
+// ====== CHECKLIST ======
+function markItem(btn, state) {
+  const item = btn.closest('.check-item');
+  item.classList.remove('done','skipped');
+  if(state==='done'){item.classList.add('done');item.querySelector('.check-box').textContent='✓';showToast('✅ כל הכבוד!');}
+  else if(state==='skipped'){item.classList.add('skipped');item.querySelector('.check-box').textContent='✗';showToast('💪 מחר ממשיכים');}
+  else if(state==='postpone'){showToast('⏰ נזכר לך בעוד שעה');}
+  const id=item.dataset.id;
+  checks[id]=state;
+  saveData('checks_'+getDayKey(0),checks);
+  updateScore();
+}
+function restoreChecks() {
+  Object.entries(checks).forEach(([id,state])=>{
+    const item=document.querySelector(`[data-id="${id}"]`);
+    if(item&&state!=='postpone'){item.classList.add(state==='done'?'done':'skipped');item.querySelector('.check-box').textContent=state==='done'?'✓':'✗';}
+  });
+}
+function updateScore() {
+  const done=Object.values(checks).filter(v=>v==='done').length;
+  const total=document.querySelectorAll('.check-item').length;
+  if(done>0){
+    const pct=Math.round((done/total)*100);
+    const el=document.getElementById('dayScore');
+    const txt=document.getElementById('dayScoreText');
+    if(el){el.style.display='block';}
+    if(txt) txt.textContent=done+' מתוך '+total+' משימות ('+pct+'%) '+(pct>=70?'🌟 מעולה!':pct>=40?'👍 טוב!':'💪 תמשיך!');
+  }
+}
+
+// ====== WEIGHT ======
+function updateWeight() {
+  const val=parseFloat(document.getElementById('weightInput').value);
+  if(!val||val<60||val>150){showToast('❌ משקל לא תקין');return;}
+  const entry={weight:val,date:new Date().toLocaleDateString('he-IL'),diff:weights.length>0?+(val-weights[weights.length-1].weight).toFixed(1):0};
+  weights.push(entry);
+  saveData('weights',weights);
+  renderWeights();
+  updateProgressBar(val);
+  const lost=+(100-val).toFixed(1);
+  const fb=document.getElementById('weightFeedback');
+  if(fb&&lost>0) fb.innerHTML=`<span style="color:var(--green)">ירדת ${lost} ק"ג!</span> נשארו <strong>${+(val-80).toFixed(1)} ק"ג</strong>`;
+  showToast('⚖️ משקל עודכן!');
+}
+function renderWeights() {
+  const list=document.getElementById('weightList');
+  if(!list) return;
+  if(weights.length===0){list.textContent='עוד לא עדכנת משקל.';return;}
+  list.innerHTML=weights.slice().reverse().map(w=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);"><span style="color:var(--muted2);font-size:12px;">${w.date}</span><span style="font-size:18px;font-weight:700;">${w.weight} ק"ג</span>${w.diff!==0?`<span style="font-size:12px;color:${w.diff<0?'var(--green)':'var(--red)'}">${w.diff>0?'+':''}${w.diff}</span>`:''}</div>`).join('');
+}
+function updateProgressBar(cur) {
+  const c=cur||(weights.length>0?weights[weights.length-1].weight:100);
+  const pct=Math.min(Math.max(((100-c)/20)*100,0),100);
+  const bar=document.getElementById('progressBar');
+  const note=document.getElementById('progressNote');
+  if(bar) bar.style.width=pct.toFixed(1)+'%';
+  if(note) note.textContent='ירדת '+(100-c).toFixed(1)+' ק"ג מתוך 20 ליעד ('+pct.toFixed(0)+'%)';
+}
+
+// ====== FOOD LOG ======
+function getDayKey(offset) {
+  const d=new Date(); d.setDate(d.getDate()+offset);
+  return d.toISOString().split('T')[0];
+}
+function getDayLabel(offset) {
+  const d=new Date(); d.setDate(d.getDate()+offset);
+  if(offset===0) return 'היום — '+DAY_NAMES[d.getDay()]+' '+d.getDate()+' '+MONTH_NAMES[d.getMonth()];
+  if(offset===-1) return 'אתמול — '+d.getDate()+' '+MONTH_NAMES[d.getMonth()];
+  return DAY_NAMES[d.getDay()]+' '+d.getDate()+' '+MONTH_NAMES[d.getMonth()];
+}
+function changeDay(dir) {
+  currentDayOffset+=dir;
+  if(currentDayOffset>0) currentDayOffset=0;
+  renderFoodLog();
+}
+function renderFoodLog() {
+  const key=getDayKey(currentDayOffset);
+  const label=getDayLabel(currentDayOffset);
+  const lbl=document.getElementById('todayDateFood');
+  if(lbl) lbl.textContent=label;
+  const dayMeals=foodLog[key]||[];
+  let totCal=0,totP=0,totC=0,totF=0;
+  dayMeals.forEach(m=>{totCal+=m.cal;totP+=m.prot;totC+=m.carb;totF+=m.fat;});
+  const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
+  set('dayCal',totCal);set('dayProt',totP+'g');set('dayCarb',totC+'g');set('dayFat',totF+'g');
+  const bar=document.getElementById('dayCalBar');
+  if(bar){bar.style.width=Math.min((totCal/1900)*100,100)+'%';bar.style.background=totCal>2100?'linear-gradient(90deg,#f87171,#ef4444)':'linear-gradient(90deg,#e8834a,#f5a623)';}
+  const list=document.getElementById('mealsList');
+  if(!list) return;
+  if(dayMeals.length===0){list.innerHTML='<div style="text-align:center;padding:24px;color:var(--muted);font-size:13px;">לא הוספת ארוחות ל'+label+'</div>';return;}
+  list.innerHTML=dayMeals.map((meal,i)=>`
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:10px;">
+      <div style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.05);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;">
+        <div><div style="font-weight:700;font-size:15px;">${meal.name}</div><div style="font-size:11px;color:var(--muted2);">${meal.time} · ${meal.items.length} מוצרים</div></div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <div style="text-align:center;"><div style="font-size:18px;font-weight:900;color:var(--gold);">${meal.cal}</div><div style="font-size:10px;color:var(--muted2);">קל׳</div></div>
+          <div style="text-align:center;"><div style="font-size:14px;font-weight:700;color:var(--purple);">${meal.prot}g</div><div style="font-size:10px;color:var(--muted2);">חל׳</div></div>
+          <button onclick="deleteMeal('${key}',${i})" style="background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.2);color:var(--red);border-radius:7px;padding:5px 9px;font-family:Heebo,sans-serif;font-size:12px;cursor:pointer;">🗑</button>
+        </div>
+      </div>
+      <div style="padding:10px 16px;">${meal.items.map(it=>`<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;color:var(--muted2);border-bottom:1px solid rgba(255,255,255,0.03);"><span>${it.name} <span style="opacity:0.6">${it.qtyLabel}</span></span><span style="color:var(--text)">${it.cal} קל׳</span></div>`).join('')}</div>
+    </div>`).join('');
+}
+async function deleteMeal(key,idx) {
+  if(!foodLog[key]) return;
+  foodLog[key].splice(idx,1);
+  await saveData('foodLog',foodLog);
+  renderFoodLog();
+  showToast('🗑️ ארוחה נמחקה');
+}
+function openAddMeal() {
+  currentAddMealItems=[];
+  document.getElementById('mealNameInput').value='';
+  document.getElementById('productSearch').value='';
+  document.getElementById('searchResults').innerHTML='';
+  document.getElementById('addMealModal').style.display='block';
+  document.body.style.overflow='hidden';
+  renderCurrentMealItems();
+}
+function closeAddMeal() { document.getElementById('addMealModal').style.display='none'; document.body.style.overflow=''; }
+function setMealName(btn) { document.getElementById('mealNameInput').value=btn.textContent; }
+async function searchProduct() {
+  const q=document.getElementById('productSearch').value.trim();
+  if(!q) return;
+  const spinner=document.getElementById('searchSpinner');
+  const results=document.getElementById('searchResults');
+  spinner.style.display='block'; results.innerHTML='';
+  try {
+    const url=`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=10&lc=he&cc=il`;
+    const res=await fetch(url);
+    const data=await res.json();
+    spinner.style.display='none';
+    const products=(data.products||[]).filter(p=>p.product_name&&p.nutriments&&p.nutriments['energy-kcal_100g']);
+    if(products.length===0){results.innerHTML='<div style="font-size:12px;color:var(--muted2);padding:10px 0;">לא נמצא. נסה באנגלית או השתמש בהוסף ידנית</div>';return;}
+    window._searchResults=products;
+    results.innerHTML=products.map((p,i)=>{
+      const name=p.product_name_he||p.product_name||'מוצר';
+      const brand=p.brands||'';
+      const cal=Math.round(p.nutriments['energy-kcal_100g']||0);
+      const prot=Math.round(p.nutriments.proteins_100g||0);
+      const img=p.image_small_url||'';
+      return `<div onclick="openQtyModal(${i})" style="display:flex;align-items:center;gap:10px;padding:10px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:10px;cursor:pointer;margin-bottom:6px;transition:all 0.15s;" onmouseover="this.style.borderColor='rgba(245,166,35,0.4)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.07)'">
+        ${img?`<img src="${img}" style="width:40px;height:40px;object-fit:contain;border-radius:6px;flex-shrink:0;" onerror="this.style.display='none'" />`:'<div style="width:40px;height:40px;background:rgba(255,255,255,0.04);border-radius:6px;flex-shrink:0;display:flex;align-items:center;justify-content:center;">🛒</div>'}
+        <div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${name}</div>${brand?`<div style="font-size:11px;color:var(--muted2);">${brand}</div>`:''}</div>
+        <div style="text-align:left;flex-shrink:0;"><div style="font-size:14px;font-weight:700;color:var(--gold);">${cal}</div><div style="font-size:10px;color:var(--muted2);">קל׳/100g</div></div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    spinner.style.display='none';
+    results.innerHTML='<div style="font-size:12px;color:var(--red);padding:10px 0;">שגיאת חיבור</div>';
+  }
+}
+function openQtyModal(idx) {
+  const p=window._searchResults[idx];
+  const name=p.product_name_he||p.product_name;
+  pendingProduct={name,cal100:Math.round(p.nutriments['energy-kcal_100g']||0),prot100:Math.round(p.nutriments.proteins_100g||0),carb100:Math.round(p.nutriments.carbohydrates_100g||0),fat100:Math.round(p.nutriments.fat_100g||0),brand:p.brands||''};
+  document.getElementById('qtyProductName').textContent=name;
+  document.getElementById('qtyProductMeta').textContent=(p.brands||'')+' · '+pendingProduct.cal100+' קל׳/100g · חל׳ '+pendingProduct.prot100+'g';
+  document.getElementById('qtyAmount').value='1';
+  document.getElementById('qtyUnit').value='serving';
+  document.getElementById('qtyModal').style.display='flex';
+  updateQtyPreview();
+}
+function quickAdd(name,grams,cal,prot,carb,fat,label) {
+  pendingProduct={name,cal100:Math.round(cal/grams*100),prot100:Math.round(prot/grams*100),carb100:Math.round(carb/grams*100),fat100:Math.round(fat/grams*100),brand:'',_unitGrams:grams};
+  document.getElementById('qtyProductName').textContent=name;
+  document.getElementById('qtyProductMeta').textContent=cal+' קל׳ · '+prot+'g חלבון · '+label;
+  document.getElementById('qtyAmount').value='1';
+  document.getElementById('qtyUnit').value='unit';
+  document.getElementById('qtyModal').style.display='flex';
+  updateQtyPreview();
+}
+function setQty(amt,unit){document.getElementById('qtyAmount').value=amt;document.getElementById('qtyUnit').value=unit;updateQtyPreview();}
+function getGrams(){const amt=parseFloat(document.getElementById('qtyAmount').value)||1;const unit=document.getElementById('qtyUnit').value;const map={serving:100,g:1,ml:1,unit:pendingProduct._unitGrams||100,cup:240,tbsp:15,tsp:5,handful:30};return amt*(map[unit]||100);}
+function getUnitLabel(){const amt=document.getElementById('qtyAmount').value;const unit=document.getElementById('qtyUnit').value;const labels={serving:'מנה',g:'g',ml:'ml',unit:'יח׳',cup:'כוס',tbsp:'כף',tsp:'כפית',handful:'חופן'};return amt+' '+(labels[unit]||unit);}
+function updateQtyPreview(){
+  if(!pendingProduct) return;
+  const g=getGrams();
+  const cal=Math.round(pendingProduct.cal100*g/100);
+  const prot=Math.round(pendingProduct.prot100*g/100);
+  const carb=Math.round(pendingProduct.carb100*g/100);
+  const fat=Math.round(pendingProduct.fat100*g/100);
+  const el=document.getElementById('qtyPreview');
+  if(el) el.innerHTML=`<strong>${getUnitLabel()} = ${g}g</strong> &nbsp;|&nbsp; <span style="color:var(--gold)">${cal} קל׳</span> &nbsp;|&nbsp; <span style="color:var(--purple)">חל׳ ${prot}g</span> &nbsp;|&nbsp; <span style="color:var(--blue)">פח׳ ${carb}g</span> &nbsp;|&nbsp; <span style="color:var(--green)">שמן ${fat}g</span>`;
+}
+function confirmAddProduct(){
+  if(!pendingProduct) return;
+  const g=getGrams();
+  currentAddMealItems.push({name:pendingProduct.name,qtyLabel:getUnitLabel(),grams:g,cal:Math.round(pendingProduct.cal100*g/100),prot:Math.round(pendingProduct.prot100*g/100),carb:Math.round(pendingProduct.carb100*g/100),fat:Math.round(pendingProduct.fat100*g/100)});
+  closeQty(); renderCurrentMealItems();
+}
+function closeQty(){document.getElementById('qtyModal').style.display='none';pendingProduct=null;}
+function renderCurrentMealItems(){
+  const container=document.getElementById('currentMealItems');
+  const totalEl=document.getElementById('mealRunTotal');
+  if(currentAddMealItems.length===0){container.innerHTML='<div style="font-size:13px;color:var(--muted);text-align:center;padding:12px;">עוד לא הוספת מוצרים</div>';if(totalEl)totalEl.style.display='none';return;}
+  container.innerHTML=currentAddMealItems.map((it,i)=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:rgba(255,255,255,0.03);border-radius:8px;"><div style="flex:1;font-size:13px;">${it.name} <span style="color:var(--muted2);font-size:11px;">${it.qtyLabel}</span></div><div style="font-size:13px;color:var(--gold);font-weight:700;">${it.cal}</div><div style="font-size:11px;color:var(--purple);">${it.prot}g</div><button onclick="removeItem(${i})" style="background:rgba(248,113,113,0.1);border:none;color:var(--red);border-radius:5px;padding:3px 7px;font-size:11px;cursor:pointer;">✕</button></div>`).join('');
+  const totCal=currentAddMealItems.reduce((a,i)=>a+i.cal,0);
+  const totP=currentAddMealItems.reduce((a,i)=>a+i.prot,0);
+  const totC=currentAddMealItems.reduce((a,i)=>a+i.carb,0);
+  const totF=currentAddMealItems.reduce((a,i)=>a+i.fat,0);
+  if(totalEl){totalEl.style.display='flex';['cal','prot','carb','fat'].forEach((k,i)=>{const el=document.getElementById('mrt_'+k);if(el)el.textContent=[totCal,totP+'g',totC+'g',totF+'g'][i];});}
+}
+function removeItem(i){currentAddMealItems.splice(i,1);renderCurrentMealItems();}
+async function saveMealToLog(){
+  const name=document.getElementById('mealNameInput').value.trim()||'ארוחה';
+  if(currentAddMealItems.length===0){showToast('❌ הוסף לפחות מוצר אחד');return;}
+  const key=getDayKey(currentDayOffset);
+  if(!foodLog[key]) foodLog[key]=[];
+  const now=new Date();
+  const time=now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
+  const totCal=currentAddMealItems.reduce((a,i)=>a+i.cal,0);
+  const totP=currentAddMealItems.reduce((a,i)=>a+i.prot,0);
+  const totC=currentAddMealItems.reduce((a,i)=>a+i.carb,0);
+  const totF=currentAddMealItems.reduce((a,i)=>a+i.fat,0);
+  foodLog[key].push({name,time,items:currentAddMealItems,cal:totCal,prot:totP,carb:totC,fat:totF});
+  await saveData('foodLog',foodLog);
+  closeAddMeal(); renderFoodLog();
+  showToast('✅ '+name+' נשמרה! '+totCal+' קל׳');
+}
+function toggleWeeklySummary(){
+  const el=document.getElementById('weeklySummary');
+  if(el.style.display==='none'){el.style.display='block';renderWeeklySummary();}else el.style.display='none';
+}
+function renderWeeklySummary(){
+  const el=document.getElementById('weeklySummary');
+  if(!el) return;
+  let rows='',weekTotal=0;
+  for(let i=-6;i<=0;i++){
+    const key=getDayKey(i);
+    const meals=foodLog[key]||[];
+    const cal=meals.reduce((a,m)=>a+m.cal,0);
+    weekTotal+=cal;
+    const pct=Math.min((cal/1900)*100,100);
+    const d=new Date();d.setDate(d.getDate()+i);
+    rows+=`<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><div style="font-size:12px;color:var(--muted2);width:55px;">${DAY_NAMES[d.getDay()]}</div><div style="flex:1;height:6px;background:rgba(255,255,255,0.06);border-radius:100px;overflow:hidden;"><div style="width:${pct}%;height:100%;background:${cal>2100?'var(--red)':'var(--gold)'};border-radius:100px;"></div></div><div style="font-size:13px;font-weight:700;color:${cal===0?'var(--muted)':cal>2100?'var(--red)':'var(--gold)'};width:48px;text-align:left;">${cal||'—'}</div></div>`;
+  }
+  el.innerHTML=`<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;">${rows}<div style="margin-top:10px;font-size:12px;color:var(--muted2);">ממוצע: <strong style="color:var(--gold)">${Math.round(weekTotal/7)} קל׳</strong> | יעד: 1,900</div></div>`;
+}
+
+// ====== TOAST ======
+function showToast(msg){
+  const t=document.getElementById('toast');
+  if(!t) return;
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2800);
+}
+
+// ====== PUSH NOTIFICATIONS ENGINE ======
+const DEFAULT_NOTIF_SCHEDULE = [
+  { id: 'meal1', type: 'meal', title: '🍳 זמן ארוחה 1!', body: '3 ביצים + לחם מלא + ירק | ~540 קל'', time: '08:30', days: [0,1,2,3,4,5,6], enabled: true },
+  { id: 'meal2', type: 'meal', title: '🥩 זמן ארוחה 2!', body: 'בשר/עוף/דג + אורז/בטטה + סלט | ~700 קל'', time: '14:00', days: [0,1,2,3,4,5,6], enabled: true },
+  { id: 'workout_eve', type: 'workout', title: '💪 מחר יש אימון א'!', body: 'רגליים + גב + בטן. תכין נעלי ספורט!', time: '20:00', days: [0], enabled: true },
+  { id: 'workout_eve2', type: 'workout', title: '💪 מחר יש אימון ב'!', body: 'פלג עליון + בטן + צוואר. יאללה!', time: '20:00', days: [3], enabled: true },
+  { id: 'water_morning', type: 'water', title: '💧 מים בוקר!', body: 'כוס מים על קיבה ריקה — לפני הכל', time: '06:30', days: [0,1,2,3,4,5,6], enabled: true },
+  { id: 'water_mid', type: 'water', title: '💧 שתית מספיק?', body: 'צריך להיות על 4+ כוסות עכשיו', time: '11:00', days: [0,1,2,3,4,5,6], enabled: true },
+  { id: 'water_aft', type: 'water', title: '💧 מים אחה"צ!', body: 'עוד 3-4 כוסות עד הערב', time: '15:30', days: [0,1,2,3,4,5,6], enabled: true },
+  { id: 'water_night', type: 'water', title: '💧 מים לפני שינה', body: 'כוס אחרונה — מאיץ חילוף חומרים בלילה', time: '22:00', days: [0,1,2,3,4,5,6], enabled: true },
+  { id: 'weight', type: 'weight', title: '⚖️ שקילה שבועית!', body: 'לפני אוכל, אחרי שירותים. עדכן במערכת!', time: '08:00', days: [0], enabled: true },
+];
+
+let notifSchedule = [];
+let editingRuleId = null;
+
+const TYPE_ICONS = { meal: '🍽️', workout: '💪', water: '💧', weight: '⚖️', custom: '✏️' };
+const DAY_SHORT = ['א'','ב'','ג'','ד'','ה'','ו'','ש''];
+
+// Init push
+async function initPush() {
+  notifSchedule = await loadData('notifSchedule', DEFAULT_NOTIF_SCHEDULE);
+  updatePushPermissionUI();
+}
+
+function updatePushPermissionUI() {
+  const status = Notification.permission;
+  const banner = document.getElementById('pushPermissionBanner');
+  const statusText = document.getElementById('pushStatusText');
+  const statusSub = document.getElementById('pushStatusSub');
+  const enableBtn = document.getElementById('pushEnableBtn');
+  const builder = document.getElementById('scheduleBuilder');
+
+  if (status === 'granted') {
+    banner.style.background = 'rgba(52,211,153,0.08)';
+    banner.style.borderColor = 'rgba(52,211,153,0.25)';
+    statusText.textContent = '✅ התראות מופעלות';
+    statusSub.textContent = 'אתה תקבל Push Notifications לפי הלוח הגדרות למטה';
+    enableBtn.style.display = 'none';
+    builder.style.display = 'block';
+    renderNotifRules();
+    registerServiceWorker();
+  } else if (status === 'denied') {
+    banner.style.background = 'rgba(248,113,113,0.08)';
+    banner.style.borderColor = 'rgba(248,113,113,0.25)';
+    statusText.textContent = '❌ התראות חסומות';
+    statusSub.textContent = 'כדי להפעיל: הגדרות הדפדפן ← האתר ← אפשר התראות';
+    enableBtn.style.display = 'none';
+    builder.style.display = 'none';
+  } else {
+    statusText.textContent = '🔔 התראות לא מופעלות';
+    statusSub.textContent = 'לחץ "הפעל התראות" כדי לקבל תזכורות';
+    enableBtn.style.display = 'block';
+    builder.style.display = 'none';
+  }
+}
+
+async function requestPushPermission() {
+  const btn = document.getElementById('pushEnableBtn');
+  btn.textContent = 'מבקש הרשאה...';
+  btn.disabled = true;
+  try {
+    const result = await Notification.requestPermission();
+    if (result === 'granted') {
+      showToast('✅ התראות הופעלו!');
+      await registerServiceWorker();
+    } else {
+      showToast('❌ ההרשאה נדחתה');
+    }
+  } catch(e) {
+    showToast('שגיאה: ' + e.message);
+  }
+  btn.disabled = false;
+  updatePushPermissionUI();
+}
+
+async function registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+  try {
+    const reg = await navigator.serviceWorker.register('/Yoav-fitness/firebase-messaging-sw.js', { scope: '/Yoav-fitness/' });
+    console.log('SW registered:', reg.scope);
+    await syncScheduleToSW();
+    startLocalScheduler();
+  } catch(e) {
+    console.warn('SW registration failed:', e);
+    // Fallback to local scheduler only
+    startLocalScheduler();
+  }
+}
+
+async function syncScheduleToSW() {
+  if (!navigator.serviceWorker.controller) return;
+  navigator.serviceWorker.controller.postMessage({
+    type: 'SYNC_SCHEDULE',
+    schedule: notifSchedule
+  });
+  // Also save to cache for SW to read
+  try {
+    const cache = await caches.open('yoav-fit-schedule');
+    await cache.put('schedule', new Response(JSON.stringify(notifSchedule)));
+  } catch(e) {}
+}
+
+// ====== LOCAL SCHEDULER (runs in page, fallback) ======
+let schedulerInterval = null;
+
+function startLocalScheduler() {
+  if (schedulerInterval) clearInterval(schedulerInterval);
+  schedulerInterval = setInterval(checkLocalNotifications, 30000); // every 30 sec
+  checkLocalNotifications(); // immediate check
+}
+
+async function checkLocalNotifications() {
+  if (Notification.permission !== 'granted') return;
+  const now = new Date();
+  const timeStr = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+  const day = now.getDay();
+  const todayKey = now.toDateString();
+
+  const firedToday = JSON.parse(sessionStorage.getItem('firedNotifs_' + todayKey) || '[]');
+
+  for (const rule of notifSchedule) {
+    if (!rule.enabled) continue;
+    if (rule.time !== timeStr) continue;
+    if (rule.days && !rule.days.includes(day)) continue;
+    if (firedToday.includes(rule.id)) continue;
+
+    new Notification(rule.title, {
+      body: rule.body,
+      icon: '/Yoav-fitness/icon-192.png',
+      dir: 'rtl',
+      lang: 'he',
+      tag: rule.id,
+    });
+
+    firedToday.push(rule.id);
+    sessionStorage.setItem('firedNotifs_' + todayKey, JSON.stringify(firedToday));
+  }
+}
+
+// ====== RULE EDITOR ======
+function renderNotifRules() {
+  const container = document.getElementById('notifRulesList');
+  if (!container) return;
+
+  const grouped = {};
+  notifSchedule.forEach(r => {
+    if (!grouped[r.type]) grouped[r.type] = [];
+    grouped[r.type].push(r);
+  });
+
+  container.innerHTML = Object.entries(grouped).map(([type, rules]) => `
+    <div style="margin-bottom:16px;">
+      <div style="font-size:12px;color:var(--muted2);font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;">${TYPE_ICONS[type]} ${typeLabel(type)}</div>
+      ${rules.map(r => `
+        <div class="notif-card ${r.enabled ? '' : 'disabled'}" style="margin-bottom:8px;">
+          <label class="notif-toggle">
+            <input type="checkbox" ${r.enabled ? 'checked' : ''} onchange="toggleRule('${r.id}', this.checked)">
+            <span class="notif-slider"></span>
+          </label>
+          <div style="flex:1;cursor:pointer;" onclick="editRule('${r.id}')">
+            <div style="font-weight:600;font-size:14px;">${r.title}</div>
+            <div style="font-size:11px;color:var(--muted2);margin-top:2px;">${r.time} · ${formatDays(r.days)}</div>
+          </div>
+          <button onclick="editRule('${r.id}')" style="background:rgba(255,255,255,0.05);border:1px solid var(--border);color:var(--muted2);border-radius:7px;padding:5px 10px;font-family:Heebo,sans-serif;font-size:12px;cursor:pointer;">✏️</button>
+        </div>`).join('')}
+    </div>`).join('');
+}
+
+function typeLabel(t) {
+  return {meal:'ארוחות', workout:'אימונים', water:'מים', weight:'שקילה', custom:'מותאם אישית'}[t] || t;
+}
+
+function formatDays(days) {
+  if (!days || days.length === 7) return 'כל הימים';
+  if (days.length === 0) return 'לא מוגדר';
+  return days.map(d => DAY_SHORT[d]).join(' ');
+}
+
+function toggleRule(id, enabled) {
+  const rule = notifSchedule.find(r => r.id === id);
+  if (rule) { rule.enabled = enabled; syncScheduleToSW(); }
+}
+
+function addNotifRule() {
+  editingRuleId = null;
+  document.getElementById('ruleModalTitle').textContent = '➕ התראה חדשה';
+  document.getElementById('ruleDeleteBtn').style.display = 'none';
+  document.getElementById('ruleTitle').value = '';
+  document.getElementById('ruleBody').value = '';
+  document.getElementById('ruleTime').value = '09:00';
+  selectAllDays(true);
+  document.querySelectorAll('.rule-type-btn').forEach((b,i) => b.classList.toggle('active', i===0));
+  document.getElementById('addRuleModal').style.display = 'block';
+  document.body.style.overflow = 'hidden';
+}
+
+function editRule(id) {
+  const rule = notifSchedule.find(r => r.id === id);
+  if (!rule) return;
+  editingRuleId = id;
+  document.getElementById('ruleModalTitle').textContent = '✏️ ערוך התראה';
+  document.getElementById('ruleDeleteBtn').style.display = 'block';
+  document.getElementById('ruleTitle').value = rule.title;
+  document.getElementById('ruleBody').value = rule.body;
+  document.getElementById('ruleTime').value = rule.time;
+  document.querySelectorAll('.rule-type-btn').forEach(b => b.classList.toggle('active', b.dataset.type === rule.type));
+  document.querySelectorAll('.rule-day-btn').forEach(b => b.classList.toggle('active', rule.days.includes(parseInt(b.dataset.day))));
+  document.getElementById('addRuleModal').style.display = 'block';
+  document.body.style.overflow = 'hidden';
+}
+
+function closeRuleModal() {
+  document.getElementById('addRuleModal').style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+function selectRuleType(btn) {
+  document.querySelectorAll('.rule-type-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  // Auto-fill title/body based on type
+  const presets = {
+    meal: {title: '🍽️ זמן לאכול!', body: 'אל תפספס ארוחה — חשוב לתהליך'},
+    workout: {title: '💪 זמן לאימון!', body: 'יאללה, קום ותתאמן!'},
+    water: {title: '💧 שתה מים!', body: 'שמור על הגוף שלך מימים'},
+    weight: {title: '⚖️ שקול את עצמך', body: 'בוקר טוב — זמן לשקילה שבועית'},
+    custom: {title: '', body: ''},
+  };
+  const p = presets[btn.dataset.type];
+  if (p && !document.getElementById('ruleTitle').value) {
+    document.getElementById('ruleTitle').value = p.title;
+    document.getElementById('ruleBody').value = p.body;
+  }
+}
+
+function toggleRuleDay(btn) { btn.classList.toggle('active'); }
+
+function selectAllDays(all) {
+  document.querySelectorAll('.rule-day-btn').forEach(b => b.classList.toggle('active', all));
+}
+
+function selectWorkoutDays() {
+  document.querySelectorAll('.rule-day-btn').forEach(b => {
+    const d = parseInt(b.dataset.day);
+    b.classList.toggle('active', d === 1 || d === 4); // Mon + Thu
+  });
+}
+
+function saveRule() {
+  const title = document.getElementById('ruleTitle').value.trim();
+  if (!title) { showToast('❌ הכנס כותרת'); return; }
+  const type = document.querySelector('.rule-type-btn.active')?.dataset.type || 'custom';
+  const days = [];
+  document.querySelectorAll('.rule-day-btn.active').forEach(b => days.push(parseInt(b.dataset.day)));
+  const rule = {
+    id: editingRuleId || 'rule_' + Date.now(),
+    type,
+    title,
+    body: document.getElementById('ruleBody').value.trim(),
+    time: document.getElementById('ruleTime').value,
+    days,
+    enabled: true
+  };
+  if (editingRuleId) {
+    notifSchedule = notifSchedule.map(r => r.id === editingRuleId ? rule : r);
+  } else {
+    notifSchedule.push(rule);
+  }
+  closeRuleModal();
+  renderNotifRules();
+  showToast('✅ התראה נשמרה');
+}
+
+function deleteCurrentRule() {
+  if (!editingRuleId) return;
+  notifSchedule = notifSchedule.filter(r => r.id !== editingRuleId);
+  closeRuleModal();
+  renderNotifRules();
+  showToast('🗑️ התראה נמחקה');
+}
+
+async function saveNotifSchedule() {
+  await saveData('notifSchedule', notifSchedule);
+  await syncScheduleToSW();
+  showToast('✅ הגדרות התראות נשמרו!');
+  // Send test notification
+  if (Notification.permission === 'granted') {
+    setTimeout(() => {
+      new Notification('✅ הגדרות נשמרו!', {
+        body: 'מערכת ההתראות פעילה ומוכנה',
+        icon: '/Yoav-fitness/icon-192.png',
+        dir: 'rtl'
+      });
+    }, 500);
+  }
+}
+
+// Add initPush to DOMContentLoaded
+const _origDOMReady = document.addEventListener;
+document.addEventListener('DOMContentLoaded', () => {
+  setTimeout(initPush, 300);
+});
+
+
+
+// ═══════════════════════════════════════
+// BOTTOM NAV + FAB
+// ═══════════════════════════════════════
+let _fabOpen = false;
+
+function toggleFab() { _fabOpen ? closeFab() : openFab(); }
+function openFab() {
+  _fabOpen = true;
+  document.getElementById('fabBtn')?.classList.add('open');
+  document.getElementById('fabOverlay')?.classList.add('show');
+  document.getElementById('fabMenu')?.classList.add('show');
+  document.body.style.overflow = 'hidden';
+}
+function closeFab() {
+  _fabOpen = false;
+  document.getElementById('fabBtn')?.classList.remove('open');
+  document.getElementById('fabOverlay')?.classList.remove('show');
+  document.getElementById('fabMenu')?.classList.remove('show');
+  document.body.style.overflow = '';
+}
+
+function goTab(id, btn) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.bnav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(id)?.classList.add('active');
+  if (btn) btn.classList.add('active');
+  else {
+    const b = document.querySelector(`.bnav-btn[data-tab="${id}"]`);
+    if (b) b.classList.add('active');
+  }
+  window.scrollTo({top: 0, behavior: 'smooth'});
+  closeFab();
+  // Lazy renders
+  if (id === 'dashboard')   renderDashboard();
+  if (id === 'calendar')    renderCalendar();
+  if (id === 'alcohol')     renderAlcohol();
+  if (id === 'progress')    renderProgressSection();
+  if (id === 'achievements') renderAchievements();
+  if (id === 'events')      renderEventModes();
+}
+
+// Override old showTab to use goTab
+function showTab(id, btn) { goTab(id, btn); }
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeFab(); });
+
+function addWaterCup() {
+  waterCount = Math.min(waterCount + 1, 12);
+  saveData('waterCount_' + getDayKey(), waterCount);
+  renderWaterCups();
+  if (waterCount >= 10) showToast('🎉 יעד המים הושג!');
+}
+
+// ═══════════════════════════════════════
+// ALCOHOL TRACKER
+// ═══════════════════════════════════════
+const DRINK_DB = [
+  {id:'vodka',   cat:'ספירט',   name:'וודקה שוט',         icon:'🥃', ml:40,  units:1.3, cal:92},
+  {id:'gin',     cat:'ספירט',   name:"ג'ין שוט",          icon:'🥃', ml:40,  units:1.3, cal:92},
+  {id:'whiskey', cat:'ספירט',   name:'וויסקי שוט',        icon:'🥃', ml:40,  units:1.3, cal:98},
+  {id:'arak',    cat:'ספירט',   name:'ערק שוט',           icon:'🥃', ml:40,  units:1.3, cal:92},
+  {id:'tequila', cat:'ספירט',   name:'טקילה שוט',         icon:'🥃', ml:40,  units:1.2, cal:96},
+  {id:'caesar',  cat:'ספירט',   name:'צייסר',             icon:'🥃', ml:45,  units:1.5, cal:110},
+  {id:'vd',      cat:'דרינק',   name:'וודקה + שתייה קלה', icon:'🍹', ml:250, units:1.6, cal:180},
+  {id:'gt',      cat:'דרינק',   name:"ג'ין טוניק",        icon:'🍹', ml:250, units:1.6, cal:170},
+  {id:'wc',      cat:'דרינק',   name:'וויסקי קולה',       icon:'🍹', ml:250, units:1.6, cal:195},
+  {id:'vrb',     cat:'דרינק',   name:'וודקה רד בול',      icon:'🍹', ml:300, units:1.4, cal:230},
+  {id:'mojito',  cat:'קוקטייל', name:'מוחיטו',            icon:'🍸', ml:250, units:2.0, cal:220},
+  {id:'marg',    cat:'קוקטייל', name:'מרגריטה',           icon:'🍸', ml:200, units:2.1, cal:200},
+  {id:'li',      cat:'קוקטייל', name:'לונג איילנד',       icon:'🍸', ml:300, units:5.3, cal:380},
+  {id:'beer_h',  cat:'בירה',    name:'בירה חצי',          icon:'🍺', ml:250, units:1.0, cal:115},
+  {id:'beer_p',  cat:'בירה',    name:'בירה פינט',         icon:'🍺', ml:500, units:2.0, cal:230},
+  {id:'beer_b',  cat:'בירה',    name:'בירה בקבוק 330',    icon:'🍺', ml:330, units:1.3, cal:150},
+  {id:'beer_c',  cat:'בירה',    name:'קרפט / IPA',        icon:'🍺', ml:330, units:1.9, cal:200},
+  {id:'wine_r',  cat:'יין',     name:'יין אדום כוס',      icon:'🍷', ml:150, units:1.5, cal:125},
+  {id:'wine_w',  cat:'יין',     name:'יין לבן כוס',       icon:'🥂', ml:150, units:1.4, cal:121},
+  {id:'wine_s',  cat:'יין',     name:'שמפניה / קאוה',     icon:'🥂', ml:150, units:1.4, cal:120},
+  {id:'wine_btl',cat:'יין',     name:'בקבוק יין שלם',     icon:'🍷', ml:750, units:7.5, cal:625},
+];
+
+let _alcDay = null;
+
+function renderAlcohol() {
+  const el = document.getElementById('alcoholContent');
+  if (!el) return;
+  const today  = getDayKey();
+  const date   = _alcDay || today;
+  const log    = loadData('alcoholLog_' + date, []);
+  const totU   = +log.reduce((a,d)=>a+(d.units||0),0).toFixed(1);
+  const totCal = log.reduce((a,d)=>a+(d.cal||0),0);
+  const risk   = totU===0?['✅ נקי','var(--green)']:totU<=2?['⚠️ מתון','var(--gold)']:totU<=4?['🟠 גבוה','var(--orange,#fb923c)']:['🔴 גבוה מאוד','var(--red)'];
+  const tip    = totU===0?'':totU<=1?'💡 שתייה קלה — לא אמורה להשפיע על האימון מחר.':totU<=2?'💡 מתון — שתה מים לפני השינה.':totU<=4?'💡 שתייה גבוהה — תשפיע על שינה ושריפת שומן.':'💡 שתייה כבדה — דלג על האימון מחר אם אפשר.';
+
+  // Week bars
+  let weekBars = '';
+  for (let i=-6;i<=0;i++) {
+    const k=getDayKey(i), dr=loadData('alcoholLog_'+k,[]);
+    const u=dr.reduce((a,d)=>a+(d.units||0),0);
+    const d=new Date(); d.setDate(d.getDate()+i);
+    const col=u===0?'rgba(255,255,255,0.1)':u<=2?'#34d399':u<=4?'#f5a623':'#f87171';
+    weekBars+=`<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;">
+      <div style="width:100%;background:${col};border-radius:3px 3px 0 0;height:${Math.max((u/8)*48,2)}px;min-height:2px;"></div>
+      <div style="font-size:9px;color:var(--muted2);">${['א','ב','ג','ד','ה','ו','ש'][d.getDay()]}</div>
+    </div>`;
+  }
+
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+      <button onclick="_alcDay=getDayKey((_alcDay?dayOffset(_alcDay):-1)-1+1-1);_alcDay=prevDay(_alcDay||getDayKey());renderAlcohol()" class="btn btn-ghost" style="padding:6px 12px;">◀</button>
+      <div style="font-weight:600;font-size:14px;">${date===today?'היום':date}</div>
+      <button onclick="_alcDay=nextDay(_alcDay||getDayKey());if(_alcDay>=getDayKey())_alcDay=null;renderAlcohol()" class="btn btn-ghost" style="padding:6px 12px;${(!_alcDay||_alcDay>=today)?'opacity:0.3;pointer-events:none':''}">▶</button>
+    </div>
+
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:12px;">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center;">
+        <div><div style="font-size:24px;font-weight:900;color:${risk[1]};">${totU}</div><div style="font-size:10px;color:var(--muted2);">יחידות</div></div>
+        <div><div style="font-size:24px;font-weight:900;color:var(--gold);">${totCal}</div><div style="font-size:10px;color:var(--muted2);">קל׳</div></div>
+        <div><div style="font-size:16px;font-weight:700;">${risk[0]}</div><div style="font-size:10px;color:var(--muted2);">סיכון</div></div>
+      </div>
+      ${tip?`<div style="margin-top:10px;font-size:12px;color:var(--muted2);padding:8px;background:rgba(255,255,255,0.03);border-radius:8px;">${tip}</div>`:''}
+    </div>
+
+    <button onclick="openAlcModal()" class="btn btn-ghost btn-full" style="border:1px dashed rgba(245,166,35,0.35);color:var(--gold);margin-bottom:12px;padding:13px;">🍺 + הוסף שתייה</button>
+
+    ${log.length===0?`<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;">לא תיעדת שתייה היום 👍</div>`:
+      log.map((d,i)=>`<div style="background:var(--card);border:1px solid var(--border);border-radius:11px;padding:11px 13px;margin-bottom:7px;display:flex;align-items:center;gap:10px;">
+        <span style="font-size:22px;">${d.icon}</span>
+        <div style="flex:1;"><div style="font-weight:600;font-size:13px;">${d.name}</div><div style="font-size:11px;color:var(--muted2);">${d.time} · ${d.ml}ml · ${d.units} יח׳ · ${d.cal} קל׳</div></div>
+        <button onclick="removeAlcDrink(${i})" style="background:rgba(248,113,113,0.1);border:none;color:var(--red);border-radius:5px;padding:4px 8px;font-size:11px;cursor:pointer;">✕</button>
+      </div>`).join('')}
+
+    <div style="margin-top:14px;">
+      <div style="font-size:13px;font-weight:700;margin-bottom:8px;">📊 שבוע אחרון</div>
+      <div style="display:flex;align-items:flex-end;gap:3px;height:52px;">${weekBars}</div>
+    </div>
+
+    <!-- Add drink modal -->
+    <div id="alcModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:700;overflow-y:auto;padding:12px 8px;">
+      <div style="background:#161b27;border:1px solid rgba(255,255,255,0.12);border-radius:18px;max-width:480px;margin:0 auto;overflow:hidden;">
+        <div style="padding:14px 18px;border-bottom:1px solid rgba(255,255,255,0.07);display:flex;justify-content:space-between;align-items:center;">
+          <div style="font-size:16px;font-weight:700;">🍺 הוסף שתייה</div>
+          <button onclick="closeAlcModal()" style="background:rgba(255,255,255,0.08);border:none;color:#e2e8f0;border-radius:7px;padding:6px 12px;font-family:Heebo,sans-serif;cursor:pointer;">✕</button>
+        </div>
+        <div style="padding:14px 16px;">
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;" id="alcCatFilter">
+            ${['הכל','ספירט','דרינק','קוקטייל','בירה','יין'].map((c,i)=>`<button onclick="filterAlc('${c}',this)" style="background:${i===0?'rgba(245,166,35,0.15)':'rgba(255,255,255,0.05)'};border:1px solid ${i===0?'rgba(245,166,35,0.4)':'rgba(255,255,255,0.1)'};border-radius:100px;padding:4px 11px;font-family:Heebo,sans-serif;font-size:12px;color:${i===0?'var(--gold)':'var(--muted2)'};cursor:pointer;">${c}</button>`).join('')}
+          </div>
+          <div id="alcDrinkGrid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px;max-height:340px;overflow-y:auto;"></div>
+          <div style="margin-top:12px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:10px;padding:12px;">
+            <div style="font-size:12px;color:var(--muted2);margin-bottom:8px;">✏️ מותאם אישית</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;">
+              <div><label style="font-size:11px;color:var(--muted2);">שם</label><input id="alcName" class="input" style="margin-top:3px;" placeholder="ערק עם מיץ"/></div>
+              <div><label style="font-size:11px;color:var(--muted2);">% אלכוהול</label><input id="alcAbv" type="number" class="input" style="margin-top:3px;" placeholder="40"/></div>
+              <div><label style="font-size:11px;color:var(--muted2);">ml</label><input id="alcMl" type="number" class="input" style="margin-top:3px;" placeholder="250"/></div>
+              <div><label style="font-size:11px;color:var(--muted2);">כמות</label><input id="alcQty" type="number" class="input" style="margin-top:3px;" value="1"/></div>
+            </div>
+            <button onclick="addCustomAlc()" class="btn btn-primary btn-full" style="margin-top:8px;font-size:13px;">+ הוסף מותאם</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  filterAlc('הכל', document.querySelector('#alcCatFilter button'));
+}
+
+function prevDay(dateStr) { const d=new Date(dateStr); d.setDate(d.getDate()-1); return d.toISOString().split('T')[0]; }
+function nextDay(dateStr) { const d=new Date(dateStr); d.setDate(d.getDate()+1); return d.toISOString().split('T')[0]; }
+
+function filterAlc(cat, btn) {
+  if (btn) {
+    document.querySelectorAll('#alcCatFilter button').forEach(b => {
+      b.style.background='rgba(255,255,255,0.05)'; b.style.borderColor='rgba(255,255,255,0.1)'; b.style.color='var(--muted2)';
+    });
+    btn.style.background='rgba(245,166,35,0.15)'; btn.style.borderColor='rgba(245,166,35,0.4)'; btn.style.color='var(--gold)';
+  }
+  const grid = document.getElementById('alcDrinkGrid');
+  if (!grid) return;
+  const filtered = cat==='הכל' ? DRINK_DB : DRINK_DB.filter(d=>d.cat===cat);
+  grid.innerHTML = filtered.map(d=>`
+    <div onclick="quickAddAlc('${d.id}')" style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px;cursor:pointer;-webkit-tap-highlight-color:transparent;" ontouchstart="this.style.borderColor='rgba(245,166,35,0.4)'" ontouchend="this.style.borderColor='var(--border)'">
+      <div style="font-size:20px;margin-bottom:3px;">${d.icon}</div>
+      <div style="font-size:12px;font-weight:600;margin-bottom:1px;">${d.name}</div>
+      <div style="font-size:10px;color:var(--muted2);">${d.units} יח׳ · ${d.cal} קל׳</div>
+    </div>`).join('');
+}
+
+function openAlcModal()  { document.getElementById('alcModal').style.display='block'; document.body.style.overflow='hidden'; filterAlc('הכל',document.querySelector('#alcCatFilter button')); }
+function closeAlcModal() { document.getElementById('alcModal').style.display='none'; document.body.style.overflow=''; }
+
+function quickAddAlc(id) {
+  const drink = DRINK_DB.find(d=>d.id===id); if (!drink) return;
+  const now = new Date();
+  const time = now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
+  const date = _alcDay || getDayKey();
+  const log  = loadData('alcoholLog_'+date, []);
+  log.push({...drink, time});
+  saveData('alcoholLog_'+date, log);
+  closeAlcModal();
+  renderAlcohol();
+  showToast(`✅ ${drink.icon} ${drink.name} נוסף`);
+}
+
+function addCustomAlc() {
+  const name = document.getElementById('alcName')?.value.trim();
+  const abv  = parseFloat(document.getElementById('alcAbv')?.value)||0;
+  const ml   = parseFloat(document.getElementById('alcMl')?.value)||0;
+  const qty  = parseInt(document.getElementById('alcQty')?.value)||1;
+  if (!name) { showToast('❌ הכנס שם'); return; }
+  const units = +((ml*abv*0.008*qty)).toFixed(1);
+  const cal   = Math.round(ml*abv*0.055*qty);
+  const now   = new Date();
+  const time  = now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
+  const date  = _alcDay || getDayKey();
+  const log   = loadData('alcoholLog_'+date, []);
+  log.push({id:'custom', cat:'אחר', name, icon:'🍶', ml:ml*qty, units, cal, time});
+  saveData('alcoholLog_'+date, log);
+  closeAlcModal();
+  renderAlcohol();
+  showToast(`✅ ${name} נוסף`);
+}
+
+function removeAlcDrink(idx) {
+  const date = _alcDay || getDayKey();
+  const log  = loadData('alcoholLog_'+date, []);
+  log.splice(idx, 1);
+  saveData('alcoholLog_'+date, log);
+  renderAlcohol();
+  showToast('🗑️ הוסר');
+}
+
+
+</script>
+
+<!-- Firebase Setup Guide (hidden by default) -->
+<div id="firebaseGuide" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.95);z-index:9999;overflow-y:auto;padding:16px;">
+  <div style="background:#161b27;border:1px solid rgba(245,166,35,0.3);border-radius:20px;max-width:600px;margin:0 auto;padding:28px;">
+    <h2 style="font-size:20px;margin-bottom:16px;">🔥 הגדרת Firebase — 5 דקות, חינם לגמרי</h2>
+    <div style="font-size:13px;color:#94a3b8;line-height:2;">
+      <strong style="color:#f5a623;">שלב 1:</strong> כנס ל-<a href="https://console.firebase.google.com" target="_blank" style="color:#60a5fa;">console.firebase.google.com</a><br>
+      <strong style="color:#f5a623;">שלב 2:</strong> "Add project" ← שם: yoav-fitness ← Continue ← Create project<br>
+      <strong style="color:#f5a623;">שלב 3:</strong> בפרויקט: "Web app" (סמל &lt;/&gt;) ← רשום שם ← Register app<br>
+      <strong style="color:#f5a623;">שלב 4:</strong> תראה את ה-firebaseConfig — העתק אותו<br>
+      <strong style="color:#f5a623;">שלב 5:</strong> Build ← Firestore Database ← Create database ← Start in test mode<br>
+      <strong style="color:#f5a623;">שלב 6:</strong> שלח לי את ה-firebaseConfig ואני אעדכן את הקובץ תוך שניות!
+    </div>
+    <button onclick="document.getElementById('firebaseGuide').style.display='none'" style="margin-top:20px;background:linear-gradient(135deg,#e8834a,#f5a623);color:#000;border:none;border-radius:10px;padding:10px 24px;font-family:Heebo,sans-serif;font-size:14px;font-weight:700;cursor:pointer;">סגור</button>
+  </div>
+</div>
+
+</body>
+</html>
