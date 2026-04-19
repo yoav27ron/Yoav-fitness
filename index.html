@@ -343,6 +343,130 @@ const YLV2_STRINGS = {
 };
 
 /* ──────────────────────────────────────────────────────────────
+   Data layer — localStorage store + React context + derived stats
+   ────────────────────────────────────────────────────────────── */
+const STORAGE_KEY = 'yoav_life_v2_data';
+const EMPTY_DATA = {
+  version: 1,
+  profile: null,   // { name, startWeight, targetWeight, startDate, height, age }
+  mode: 'workday',
+  lang: 'he',
+  weights: [],     // [{ date: ISO, kg: number }]
+  meals: [],       // [{ date: ISO, name, kcal, protein, slot: 'breakfast'|'lunch'|'dinner'|'snack' }]
+  workouts: [],    // [{ date: ISO, type, minutes, notes? }]
+  water: [],       // [{ date: ISO }]  one entry per cup
+  checkIns: [],    // [{ date: ISO, energy, mood, sore, sleep, stress, cravings, time }]
+};
+
+function loadData() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return { ...EMPTY_DATA };
+    return { ...EMPTY_DATA, ...JSON.parse(raw) };
+  } catch (e) { return { ...EMPTY_DATA }; }
+}
+function saveData(d) { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); } catch (e) {} }
+function clearData() { try { localStorage.removeItem(STORAGE_KEY); } catch (e) {} }
+
+const StoreContext = React.createContext(null);
+function useStore() { return React.useContext(StoreContext); }
+
+function StoreProvider({ children }) {
+  const [data, setData] = React.useState(loadData);
+  React.useEffect(() => { saveData(data); }, [data]);
+
+  const api = React.useMemo(() => ({
+    data,
+    setProfile: (patch) => setData(d => ({ ...d, profile: { ...(d.profile || {}), ...patch } })),
+    setMode:    (mode)  => setData(d => ({ ...d, mode })),
+    setLang:    (lang)  => setData(d => ({ ...d, lang })),
+    addWeight:  (kg, noteDate) => setData(d => ({ ...d, weights: [...d.weights, { date: (noteDate || new Date().toISOString()), kg: +kg }] })),
+    addMeal:    (m)     => setData(d => ({ ...d, meals: [...d.meals, { date: new Date().toISOString(), ...m }] })),
+    delMeal:    (idx)   => setData(d => ({ ...d, meals: d.meals.filter((_, i) => i !== idx) })),
+    addWorkout: (w)     => setData(d => ({ ...d, workouts: [...d.workouts, { date: new Date().toISOString(), ...w }] })),
+    delWorkout: (idx)   => setData(d => ({ ...d, workouts: d.workouts.filter((_, i) => i !== idx) })),
+    addWater:   ()      => setData(d => ({ ...d, water: [...d.water, { date: new Date().toISOString() }] })),
+    removeWater: ()     => setData(d => ({ ...d, water: d.water.slice(0, -1) })),
+    saveCheckIn: (c)    => setData(d => ({ ...d, checkIns: [...d.checkIns.filter(x => x.date.slice(0,10) !== new Date().toISOString().slice(0,10)), { date: new Date().toISOString(), ...c }] })),
+    resetAll:   ()      => { clearData(); setData({ ...EMPTY_DATA }); },
+    exportJSON: ()      => JSON.stringify(data, null, 2),
+  }), [data]);
+
+  return <StoreContext.Provider value={api}>{children}</StoreContext.Provider>;
+}
+
+function todayKey() { return new Date().toISOString().slice(0, 10); }
+function isSameDay(iso) { return iso && iso.slice(0, 10) === todayKey(); }
+function isThisWeek(iso) {
+  if (!iso) return false;
+  const now = new Date(); const then = new Date(iso);
+  const diff = (now - then) / 86400000;
+  return diff >= 0 && diff < 7;
+}
+function fmtDateHe(iso) {
+  const d = new Date(iso);
+  return d.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit' });
+}
+function fmtTime(iso) {
+  return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function deriveStats(data) {
+  const { profile, weights, meals, workouts, checkIns, water } = data;
+  const todaysMeals    = meals.filter(m => isSameDay(m.date));
+  const todaysWorkouts = workouts.filter(w => isSameDay(w.date));
+  const todaysWater    = water.filter(w => isSameDay(w.date)).length;
+  const todaysKcal     = todaysMeals.reduce((a, m) => a + (+m.kcal || 0), 0);
+  const todaysProtein  = todaysMeals.reduce((a, m) => a + (+m.protein || 0), 0);
+
+  const startWeight  = (profile && profile.startWeight) || (weights[0] && weights[0].kg) || null;
+  const targetWeight = (profile && profile.targetWeight) || null;
+  const latestWeight = weights.length ? weights[weights.length - 1].kg : startWeight;
+
+  const delta       = (startWeight != null && latestWeight != null) ? (startWeight - latestWeight) : 0;
+  const totalToLose = (startWeight != null && targetWeight != null) ? (startWeight - targetWeight) : 0;
+  const progressPct = totalToLose > 0 ? Math.max(0, Math.min(1, delta / totalToLose)) : 0;
+
+  const startDate = profile && profile.startDate;
+  const dayCount  = startDate ? Math.max(1, Math.floor((Date.now() - new Date(startDate).getTime()) / 86400000) + 1) : 1;
+  const planDays  = (profile && profile.planDays) || 168;
+
+  // Streak: consecutive days from today backwards with any activity
+  const hasActivity = (dayIso) => {
+    const key = dayIso.slice(0, 10);
+    return weights.some(w => w.date.slice(0,10) === key)
+        || meals.some(m => m.date.slice(0,10) === key)
+        || workouts.some(w => w.date.slice(0,10) === key)
+        || water.some(w => w.date.slice(0,10) === key)
+        || checkIns.some(c => c.date.slice(0,10) === key);
+  };
+  let streak = 0;
+  const d = new Date();
+  while (hasActivity(d.toISOString()) && streak < 365) { streak++; d.setDate(d.getDate() - 1); }
+
+  // Averages across last 7 logged days
+  const last7 = new Array(7).fill(0).map((_, i) => { const x = new Date(); x.setDate(x.getDate() - i); return x.toISOString().slice(0,10); });
+  const proteinPerDay = last7.map(k => meals.filter(m => m.date.slice(0,10) === k).reduce((a, m) => a + (+m.protein || 0), 0));
+  const avgProtein = Math.round(proteinPerDay.reduce((a,b) => a+b, 0) / 7);
+  const waterPerDay = last7.map(k => water.filter(w => w.date.slice(0,10) === k).length);
+  const avgWater = (waterPerDay.reduce((a,b)=>a+b,0) / 7).toFixed(1);
+
+  const sessions = workouts.length;
+  const targetSessions = Math.max(20, Math.ceil(dayCount / 7) * 4); // ~4 per week goal
+
+  const todayCheckIn = checkIns.find(c => isSameDay(c.date));
+  const didCheckInToday = !!todayCheckIn;
+
+  return {
+    todaysMeals, todaysWorkouts, todaysWater, todaysKcal, todaysProtein,
+    startWeight, targetWeight, latestWeight, delta, totalToLose, progressPct,
+    dayCount, planDays, streak, avgProtein, avgWater, sessions, targetSessions,
+    todayCheckIn, didCheckInToday,
+    weights,
+  };
+}
+
+/* ──────────────────────────────────────────────────────────────
    Atoms
    ────────────────────────────────────────────────────────────── */
 function V2Icon({ name, size = 20, color = 'currentColor' }) {
@@ -449,32 +573,38 @@ function V2Ring({ size = 64, stroke = 5, value = 0.5, color = YLV2_Tokens.amber,
 /* ──────────────────────────────────────────────────────────────
    Screens — Today, CheckIn, SOS
    ────────────────────────────────────────────────────────────── */
-function V2Today({ t, L, go, state, setState, openSOS, openNotifs, openMode, mode }) {
-  const [checkedIn, setCheckedIn] = React.useState(state.checkedIn || false);
+function V2Today({ t, L, stats, store, mode, openSOS, openNotifs, openMode, openWeight, openMeal, openWorkout }) {
   const rtl = L.dir === 'rtl';
+  const profile = store.data.profile || {};
+  const displayName = profile.name || t.name;
 
-  if (!checkedIn) {
-    return <V2CheckIn t={t} L={L} onDone={(r) => { setState({ ...state, ...r, checkedIn: true }); setCheckedIn(true); }} rtl={rtl}/>;
+  if (!stats.didCheckInToday) {
+    return <V2CheckIn t={t} L={L} onDone={(r) => store.saveCheckIn(r)} rtl={rtl}/>;
   }
 
+  // Sparkline from real weight entries (fall back gracefully when there are 0/1 points)
   const W = 300, H = 60;
-  const weights = [97, 96.4, 95.8, 95.1, 94.6, 94.1, 93.8, 93.5, 93.2];
-  const min = 92.5, max = 97.5;
-  const pts = weights.map((w, i) => {
-    const x = (i/(weights.length-1))*W;
+  const weightSeries = stats.weights.map(w => w.kg);
+  const hasSeries = weightSeries.length >= 2;
+  const min = hasSeries ? Math.min(...weightSeries) - 0.5 : 0;
+  const max = hasSeries ? Math.max(...weightSeries) + 0.5 : 1;
+  const pts = hasSeries ? weightSeries.map((w, i) => {
+    const x = (i/(weightSeries.length-1))*W;
     const y = H - ((w - min)/(max - min))*H;
     return [x,y];
-  });
+  }) : [];
   const path = pts.map((p,i)=>(i===0?'M':'L')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ');
 
   return (
     <div style={{ padding: '0 0 150px', direction: L.dir, color: YLV2_Tokens.cream }}>
       <div style={{ padding: 'calc(env(safe-area-inset-top) + 64px) 22px 6px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <div style={{ fontFamily: YLV2_Type.mono, fontSize: 10.5, color: YLV2_Tokens.creamMute, letterSpacing: 1.5, textTransform: 'uppercase' }}>{t.dayCount}</div>
+          <div style={{ fontFamily: YLV2_Type.mono, fontSize: 10.5, color: YLV2_Tokens.creamMute, letterSpacing: 1.5, textTransform: 'uppercase' }}>
+            {rtl ? `יום ${stats.dayCount} מתוך ${stats.planDays}` : `Day ${stats.dayCount} of ${stats.planDays}`}
+          </div>
           <div style={{ fontFamily: rtl ? YLV2_Type.heb : YLV2_Type.serif, fontSize: 34, color: YLV2_Tokens.cream, lineHeight: 1.05, letterSpacing: -0.5, marginTop: 8 }}>
             {t.goodMorning}<br/>
-            <em style={{ color: YLV2_Tokens.amber, fontStyle: 'italic' }}>{t.name}.</em>
+            <em style={{ color: YLV2_Tokens.amber, fontStyle: 'italic' }}>{displayName}.</em>
           </div>
         </div>
         <button onClick={openSOS} style={{
@@ -566,67 +696,111 @@ function V2Today({ t, L, go, state, setState, openSOS, openNotifs, openMode, mod
         </V2Card>
       </div>
 
-      <div style={{ padding: '22px 22px 10px' }}>
+      <div style={{ padding: '22px 22px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
         <div style={{ fontFamily: rtl ? YLV2_Type.heb : YLV2_Type.serif, fontSize: 22, color: YLV2_Tokens.cream, letterSpacing: -0.2 }}>{t.yourDay}</div>
+        <span style={{ fontFamily: YLV2_Type.mono, fontSize: 10, color: YLV2_Tokens.creamMute, letterSpacing: 1 }}>{stats.todaysKcal} kcal · {stats.todaysProtein}g P</span>
       </div>
       <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {/* Today's logged activity */}
         {[
-          { time: '07:30', label: rtl ? 'צ׳ק-אין · הושלם'    : 'Check-in · done',     icon: 'check',  done: true },
-          { time: '08:00', label: rtl ? 'ארוחת בוקר חלבונית' : 'High-protein breakfast', icon: 'food',  data: '420 · 38g P' },
-          { time: '13:00', label: rtl ? 'הליכה מהירה 20 דק׳' : 'Brisk walk, 20 min',   icon: 'walk',  data: '20 min' },
-          { time: '14:00', label: rtl ? 'צהריים פשוט'        : 'Simple lunch',          icon: 'food',  data: '540 · 42g P' },
-          { time: '18:00', label: rtl ? 'רגע סכנה — בדרך הביתה' : 'Danger window',     icon: 'eye',   danger: true },
-          { time: '20:00', label: rtl ? 'ערב: כוס מים + ארוחה קלה' : 'Water + light dinner', icon: 'food', data: '480 · 36g P' },
-          { time: '22:30', label: rtl ? 'לכבות מסכים'         : 'Screens off',           icon: 'moon' },
-        ].map((r, i) => (
-          <div key={i} style={{
+          ...stats.todaysMeals.map(m => ({ time: fmtTime(m.date), label: m.name, icon: 'food', data: `${m.kcal} · ${m.protein || 0}g P` })),
+          ...stats.todaysWorkouts.map(w => ({ time: fmtTime(w.date), label: (rtl ? 'אימון · ' : 'Workout · ') + w.type, icon: 'train', data: `${w.minutes} ${t.min}` })),
+        ].sort((a, b) => a.time.localeCompare(b.time)).map((r, i) => (
+          <div key={'r'+i} style={{
             display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px',
-            background: r.danger ? 'rgba(229,107,90,0.12)' : YLV2_Tokens.inkSoft,
-            border: `1px solid ${r.danger ? 'rgba(229,107,90,0.3)' : YLV2_Tokens.creamHair}`,
-            borderRadius: 14, opacity: r.done ? 0.5 : 1,
+            background: YLV2_Tokens.inkSoft,
+            border: `1px solid ${YLV2_Tokens.creamHair}`, borderRadius: 14,
           }}>
-            <div style={{ width: 48, textAlign: rtl ? 'right' : 'left' }}>
+            <div style={{ width: 48 }}>
               <div style={{ fontFamily: YLV2_Type.mono, fontSize: 11, color: YLV2_Tokens.cream, letterSpacing: 0.5 }}>{r.time}</div>
             </div>
             <div style={{
               width: 32, height: 32, borderRadius: 10,
-              background: r.danger ? YLV2_Tokens.blood : 'rgba(233,235,230,0.06)',
-              display: 'grid', placeItems: 'center', color: r.danger ? YLV2_Tokens.cream : YLV2_Tokens.amber,
-              flexShrink: 0,
+              background: 'rgba(233,235,230,0.06)',
+              display: 'grid', placeItems: 'center', color: YLV2_Tokens.amber, flexShrink: 0,
             }}>
               <V2Icon name={r.icon} size={16}/>
             </div>
-            <div style={{ flex: 1, fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 13.5, fontWeight: 500, color: YLV2_Tokens.cream, textDecoration: r.done ? 'line-through' : 'none' }}>
-              {r.label}
-            </div>
-            {r.data && <span style={{ fontFamily: YLV2_Type.mono, fontSize: 10, color: YLV2_Tokens.creamMute }}>{r.data}</span>}
+            <div style={{ flex: 1, fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 13.5, fontWeight: 500, color: YLV2_Tokens.cream }}>{r.label}</div>
+            <span style={{ fontFamily: YLV2_Type.mono, fontSize: 10, color: YLV2_Tokens.creamMute }}>{r.data}</span>
           </div>
         ))}
+
+        {/* Empty state */}
+        {stats.todaysMeals.length === 0 && stats.todaysWorkouts.length === 0 && (
+          <div style={{
+            padding: '18px 16px', borderRadius: 14,
+            background: YLV2_Tokens.inkSoft,
+            border: `1px dashed ${YLV2_Tokens.creamHair}`,
+            textAlign: 'center',
+          }}>
+            <div style={{ fontFamily: rtl ? YLV2_Type.heb : YLV2_Type.serif, fontSize: 16, color: YLV2_Tokens.creamDim, fontStyle: 'italic' }}>
+              {rtl ? 'עדיין לא נרשם כלום היום. תוסיף את הארוחה הראשונה למטה.' : 'Nothing logged yet today. Add your first entry below.'}
+            </div>
+          </div>
+        )}
+
+        {/* Quick-add row */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginTop: 6 }}>
+          <button onClick={openMeal} style={{
+            padding: '12px 8px', borderRadius: 14,
+            background: YLV2_Tokens.amber, color: YLV2_Tokens.ink, border: 'none', cursor: 'pointer',
+            fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 12, fontWeight: 700,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+          }}>
+            <V2Icon name="plus" size={14} color={YLV2_Tokens.ink}/> {rtl ? 'ארוחה' : 'Meal'}
+          </button>
+          <button onClick={openWorkout} style={{
+            padding: '12px 8px', borderRadius: 14,
+            background: YLV2_Tokens.inkSoft, color: YLV2_Tokens.cream,
+            border: `1px solid ${YLV2_Tokens.creamHair}`, cursor: 'pointer',
+            fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 12, fontWeight: 600,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+          }}>
+            <V2Icon name="plus" size={14} color={YLV2_Tokens.amber}/> {rtl ? 'אימון' : 'Workout'}
+          </button>
+          <button onClick={openWeight} style={{
+            padding: '12px 8px', borderRadius: 14,
+            background: YLV2_Tokens.inkSoft, color: YLV2_Tokens.cream,
+            border: `1px solid ${YLV2_Tokens.creamHair}`, cursor: 'pointer',
+            fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 12, fontWeight: 600,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+          }}>
+            <V2Icon name="plus" size={14} color={YLV2_Tokens.amber}/> {rtl ? 'משקל' : 'Weight'}
+          </button>
+        </div>
       </div>
 
       <div style={{ padding: '22px 16px 10px' }}>
-        <V2Card dark>
+        <V2Card dark onClick={openWeight}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
               <div style={{ fontFamily: YLV2_Type.mono, fontSize: 10, color: YLV2_Tokens.creamMute, letterSpacing: 1, textTransform: 'uppercase' }}>
-                {t.journey} · 97 → 80 {t.kg}
+                {t.journey}{stats.startWeight != null && stats.targetWeight != null ? ` · ${stats.startWeight} → ${stats.targetWeight} ${t.kg}` : ''}
               </div>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 8, direction: 'ltr' }}>
-                <span style={{ fontFamily: YLV2_Type.serif, fontSize: 46, color: YLV2_Tokens.cream, lineHeight: 1, letterSpacing: -1 }}>93.2</span>
-                <span style={{ fontFamily: YLV2_Type.mono, fontSize: 11, color: YLV2_Tokens.amber }}>↓ 3.8 {t.kg}</span>
+                <span style={{ fontFamily: YLV2_Type.serif, fontSize: 46, color: YLV2_Tokens.cream, lineHeight: 1, letterSpacing: -1 }}>
+                  {stats.latestWeight != null ? (+stats.latestWeight).toFixed(1) : '—'}
+                </span>
+                <span style={{ fontFamily: YLV2_Type.mono, fontSize: 11, color: YLV2_Tokens.amber }}>
+                  {stats.delta > 0 ? `↓ ${stats.delta.toFixed(1)} ${t.kg}` : (stats.delta < 0 ? `↑ ${(-stats.delta).toFixed(1)} ${t.kg}` : (rtl ? 'נקודת התחלה' : 'starting point'))}
+                </span>
               </div>
             </div>
-            <V2Ring size={52} stroke={4} value={0.22}>
-              <span style={{ fontFamily: YLV2_Type.mono, fontSize: 10, color: YLV2_Tokens.cream }}>22%</span>
+            <V2Ring size={52} stroke={4} value={stats.progressPct}>
+              <span style={{ fontFamily: YLV2_Type.mono, fontSize: 10, color: YLV2_Tokens.cream }}>{Math.round(stats.progressPct * 100)}%</span>
             </V2Ring>
           </div>
-          <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="60" style={{ marginTop: 10 }} preserveAspectRatio="none">
-            <path d={path} fill="none" stroke={YLV2_Tokens.amber} strokeWidth="1.5"/>
-            <circle cx={pts[pts.length-1][0]} cy={pts[pts.length-1][1]} r="3" fill={YLV2_Tokens.amber}/>
-          </svg>
-          <div style={{ fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 12, color: YLV2_Tokens.creamDim, marginTop: 6 }}>
-            {t.pace}
-          </div>
+          {hasSeries ? (
+            <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="60" style={{ marginTop: 10 }} preserveAspectRatio="none">
+              <path d={path} fill="none" stroke={YLV2_Tokens.amber} strokeWidth="1.5"/>
+              <circle cx={pts[pts.length-1][0]} cy={pts[pts.length-1][1]} r="3" fill={YLV2_Tokens.amber}/>
+            </svg>
+          ) : (
+            <div style={{ marginTop: 12, padding: '10px 12px', borderRadius: 10, background: 'rgba(188,255,0,0.06)', border: '1px dashed rgba(188,255,0,0.2)', fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 12, color: YLV2_Tokens.creamDim }}>
+              {rtl ? 'הוסף עוד שקילה כדי שאראה לך את הגרף — לחץ על הכרטיס.' : 'Log another weigh-in to see the trend — tap the card.'}
+            </div>
+          )}
         </V2Card>
       </div>
     </div>
@@ -1095,8 +1269,13 @@ function V2Notifications({ t, L, close }) {
 /* ──────────────────────────────────────────────────────────────
    Food, Train, Progress, AI
    ────────────────────────────────────────────────────────────── */
-function V2Food({ t, L, go }) {
+function V2Food({ t, L, stats, store, openMeal }) {
   const rtl = L.dir === 'rtl';
+  const dailyTarget = 1900;   // placeholder daily kcal goal
+  const used = stats.todaysKcal;
+  const left = Math.max(0, dailyTarget - used);
+  const proteinGoal = 150;    // placeholder daily protein goal
+  const proteinLeft = Math.max(0, proteinGoal - stats.todaysProtein);
   return (
     <div style={{ padding: 'calc(env(safe-area-inset-top) + 64px) 0 calc(env(safe-area-inset-bottom) + 120px)', direction: L.dir, color: YLV2_Tokens.cream }}>
       <div style={{ padding: '0 22px 14px' }}>
@@ -1111,19 +1290,21 @@ function V2Food({ t, L, go }) {
       <div style={{ padding: '0 16px' }}>
         <V2Card dark>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <V2Ring size={88} stroke={6} value={0.39}>
+            <V2Ring size={88} stroke={6} value={Math.min(1, used / dailyTarget)}>
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontFamily: YLV2_Type.serif, fontSize: 22, color: YLV2_Tokens.cream, lineHeight: 1 }}>740</div>
-                <div style={{ fontFamily: YLV2_Type.mono, fontSize: 9, color: YLV2_Tokens.creamMute }}>/1900</div>
+                <div style={{ fontFamily: YLV2_Type.serif, fontSize: 22, color: YLV2_Tokens.cream, lineHeight: 1 }}>{used}</div>
+                <div style={{ fontFamily: YLV2_Type.mono, fontSize: 9, color: YLV2_Tokens.creamMute }}>/{dailyTarget}</div>
               </div>
             </V2Ring>
             <div style={{ flex: 1 }}>
               <div style={{ fontFamily: YLV2_Type.mono, fontSize: 10, color: YLV2_Tokens.creamMute, letterSpacing: 1, textTransform: 'uppercase' }}>
                 {rtl ? 'נשאר להיום' : 'left today'}
               </div>
-              <div style={{ fontFamily: YLV2_Type.serif, fontSize: 34, color: YLV2_Tokens.amber, lineHeight: 1, marginTop: 4 }}>1,160</div>
+              <div style={{ fontFamily: YLV2_Type.serif, fontSize: 34, color: YLV2_Tokens.amber, lineHeight: 1, marginTop: 4 }}>{left.toLocaleString()}</div>
               <div style={{ fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 12, color: YLV2_Tokens.creamDim, marginTop: 6 }}>
-                {rtl ? 'צריך עוד 62g חלבון' : 'Need 62g more protein'}
+                {proteinLeft > 0
+                  ? (rtl ? `צריך עוד ${proteinLeft}g חלבון` : `Need ${proteinLeft}g more protein`)
+                  : (rtl ? 'סגרת חלבון — כל הכבוד' : 'Protein closed — nice')}
               </div>
             </div>
           </div>
@@ -1132,46 +1313,94 @@ function V2Food({ t, L, go }) {
 
       <div style={{ padding: '12px 16px', display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 6 }}>
         {[
-          { icon: 'cam',    l: rtl ? 'צילום' : 'Photo' },
-          { icon: 'mic',    l: rtl ? 'קול'    : 'Voice' },
-          { icon: 'fridge', l: rtl ? 'מקרר'   : 'Fridge' },
-          { icon: 'plus',   l: rtl ? 'הוסף'   : 'Add' },
+          { icon: 'plus',   l: rtl ? 'הוסף'   : 'Add',    onClick: openMeal, primary: true },
+          { icon: 'drop',   l: rtl ? 'כוס מים' : 'Water', onClick: () => store.addWater() },
+          { icon: 'cam',    l: rtl ? 'צילום' : 'Photo',   onClick: openMeal },
+          { icon: 'fridge', l: rtl ? 'מקרר'   : 'Fridge', onClick: openMeal },
         ].map((a,i) => (
-          <button key={i} onClick={() => go && go('photo')} style={{
-            padding: '14px 6px', borderRadius: 14, border: `1px solid ${YLV2_Tokens.creamHair}`,
-            background: YLV2_Tokens.inkSoft, color: YLV2_Tokens.cream, cursor: 'pointer',
+          <button key={i} onClick={a.onClick} style={{
+            padding: '14px 6px', borderRadius: 14,
+            border: a.primary ? 'none' : `1px solid ${YLV2_Tokens.creamHair}`,
+            background: a.primary ? YLV2_Tokens.amber : YLV2_Tokens.inkSoft,
+            color: a.primary ? YLV2_Tokens.ink : YLV2_Tokens.cream, cursor: 'pointer',
             display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+            fontWeight: a.primary ? 700 : 500,
           }}>
-            <V2Icon name={a.icon} size={20} color={YLV2_Tokens.amber}/>
+            <V2Icon name={a.icon} size={20} color={a.primary ? YLV2_Tokens.ink : YLV2_Tokens.amber}/>
             <span style={{ fontFamily: YLV2_Type.mono, fontSize: 10, letterSpacing: 0.5 }}>{a.l}</span>
           </button>
         ))}
       </div>
 
+      {/* Water count */}
+      <div style={{ padding: '6px 16px 0' }}>
+        <V2Card dark pad={14} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ fontFamily: YLV2_Type.mono, fontSize: 10, color: YLV2_Tokens.creamMute, letterSpacing: 1, textTransform: 'uppercase' }}>
+              {rtl ? 'מים היום' : 'Water today'}
+            </div>
+            <div style={{ fontFamily: YLV2_Type.serif, fontSize: 28, color: YLV2_Tokens.cream, marginTop: 4 }}>
+              {stats.todaysWater} <span style={{ fontSize: 14, color: YLV2_Tokens.creamMute }}>/ 10 {rtl ? 'כוסות' : 'cups'}</span>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button onClick={() => store.removeWater()} disabled={stats.todaysWater === 0} style={{
+              width: 36, height: 36, borderRadius: 18, border: `1px solid ${YLV2_Tokens.creamHair}`,
+              background: 'transparent', color: YLV2_Tokens.cream, cursor: 'pointer',
+              opacity: stats.todaysWater === 0 ? 0.35 : 1, fontSize: 18,
+            }}>−</button>
+            <button onClick={() => store.addWater()} style={{
+              width: 36, height: 36, borderRadius: 18, border: 'none',
+              background: YLV2_Tokens.amber, color: YLV2_Tokens.ink, cursor: 'pointer',
+              fontSize: 18, fontWeight: 700,
+            }}>+</button>
+          </div>
+        </V2Card>
+      </div>
+
       <div style={{ padding: '20px 22px 10px' }}>
         <div style={{ fontFamily: rtl ? YLV2_Type.heb : YLV2_Type.serif, fontSize: 20, color: YLV2_Tokens.cream, letterSpacing: -0.2 }}>
-          {rtl ? 'הצעות מהחיים שלך' : 'From your real life'}
+          {rtl ? 'הארוחות שלך היום' : "Today's meals"}
         </div>
         <div style={{ fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 12, color: YLV2_Tokens.creamDim, marginTop: 4 }}>
-          {rtl ? 'חומוס, פיתה, שניצל — נלמד לנצח בתוך החיים, לא מחוץ להם.' : 'Hummus, pita, schnitzel — win inside real life, not outside it.'}
+          {stats.todaysMeals.length > 0
+            ? (rtl ? `${stats.todaysMeals.length} ארוחות · ${stats.todaysKcal} קלוריות · ${stats.todaysProtein}g חלבון` : `${stats.todaysMeals.length} meals · ${stats.todaysKcal} kcal · ${stats.todaysProtein}g protein`)
+            : (rtl ? 'עדיין לא הזנת ארוחה. תלחץ על + כדי להתחיל.' : 'No meals logged yet. Tap + to start.')}
         </div>
       </div>
       <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {[
-          { k: rtl ? 'חומוס + ביצה + סלט'       : 'Hummus + egg + salad',      kcal: 540, note: rtl ? 'פיתה קטנה בסדר' : 'small pita is fine' },
-          { k: rtl ? 'שניצל אפוי + אורז + ירק'  : 'Baked schnitzel + rice',    kcal: 620, note: rtl ? 'אפוי — לא מטוגן' : 'baked, not fried' },
-          { k: rtl ? 'שווארמה בסלט גדול'          : 'Shawarma on big salad',    kcal: 580, note: rtl ? 'בלי פיתה הפעם' : 'skip the pita today' },
-          { k: rtl ? 'יוגורט + גרנולה + פירות'   : 'Yogurt + granola + fruit', kcal: 380, note: rtl ? 'ארוחה פשוטה' : 'simple win' },
-        ].map((m,i) => (
-          <V2Card key={i} pad={14} dark style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <V2Ph label="" h={48} style={{ width: 48, flexShrink: 0 }}/>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 14, fontWeight: 500, color: YLV2_Tokens.cream }}>{m.k}</div>
-              <div style={{ fontFamily: YLV2_Type.mono, fontSize: 10, color: YLV2_Tokens.creamMute, marginTop: 2 }}>{m.note}</div>
-            </div>
-            <div style={{ fontFamily: YLV2_Type.serif, fontSize: 16, color: YLV2_Tokens.amber }}>{m.kcal}</div>
-          </V2Card>
-        ))}
+        {stats.todaysMeals.map((m, i) => {
+          const realIdx = store.data.meals.indexOf(m);
+          return (
+            <V2Card key={i} pad={14} dark style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{
+                width: 48, height: 48, borderRadius: 10,
+                background: 'rgba(188,255,0,0.12)',
+                display: 'grid', placeItems: 'center', color: YLV2_Tokens.amber, flexShrink: 0,
+              }}><V2Icon name="food" size={22}/></div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 14, fontWeight: 500, color: YLV2_Tokens.cream }}>{m.name}</div>
+                <div style={{ fontFamily: YLV2_Type.mono, fontSize: 10, color: YLV2_Tokens.creamMute, marginTop: 2 }}>{fmtTime(m.date)} · {m.slot}{m.protein ? ` · ${m.protein}g P` : ''}</div>
+              </div>
+              <div style={{ fontFamily: YLV2_Type.serif, fontSize: 16, color: YLV2_Tokens.amber }}>{m.kcal}</div>
+              <button onClick={() => store.delMeal(realIdx)} style={{
+                width: 28, height: 28, borderRadius: 14, border: `1px solid ${YLV2_Tokens.creamHair}`,
+                background: 'transparent', color: YLV2_Tokens.creamMute, cursor: 'pointer',
+                display: 'grid', placeItems: 'center',
+              }}><V2Icon name="x" size={12}/></button>
+            </V2Card>
+          );
+        })}
+        {stats.todaysMeals.length === 0 && (
+          <button onClick={openMeal} style={{
+            padding: '24px', borderRadius: 14,
+            background: 'transparent', color: YLV2_Tokens.creamDim,
+            border: `1.5px dashed ${YLV2_Tokens.creamHair}`, cursor: 'pointer',
+            fontFamily: rtl ? YLV2_Type.heb : YLV2_Type.serif, fontSize: 16, fontStyle: 'italic',
+          }}>
+            {rtl ? '+ הוסף ארוחה ראשונה' : '+ Add first meal'}
+          </button>
+        )}
       </div>
 
       <div style={{ padding: '18px 16px' }}>
@@ -1194,8 +1423,15 @@ function V2Food({ t, L, go }) {
   );
 }
 
-function V2Train({ t, L }) {
+function V2Train({ t, L, stats, store, openWorkout }) {
   const rtl = L.dir === 'rtl';
+  const typeLabel = (k) => {
+    const map = rtl
+      ? { walk:'הליכה', run:'ריצה', strength:'כוח', hiit:'HIIT', mobility:'ניידות', boxing:'אגרוף', swim:'שחיה', other:'אחר' }
+      : { walk:'Walk', run:'Run', strength:'Strength', hiit:'HIIT', mobility:'Mobility', boxing:'Boxing', swim:'Swim', other:'Other' };
+    return map[k] || k;
+  };
+  const typeIcon = (k) => ({ walk:'walk', run:'bolt', strength:'train', hiit:'flame', mobility:'heart', boxing:'bolt', swim:'drop', other:'clock' }[k] || 'train');
   return (
     <div style={{ padding: 'calc(env(safe-area-inset-top) + 64px) 0 calc(env(safe-area-inset-bottom) + 120px)', direction: L.dir, color: YLV2_Tokens.cream }}>
       <div style={{ padding: '0 22px 14px' }}>
@@ -1221,34 +1457,84 @@ function V2Train({ t, L }) {
             <div style={{ fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 13, color: YLV2_Tokens.creamDim, marginTop: 8, lineHeight: 1.4 }}>
               {rtl ? 'אמרת אנרגיה 2/5 ושינה גרועה. זה המינימום שישאיר אותך במסלול — בלי לשרוף אותך.' : 'You said energy 2/5 and bad sleep. Minimum to stay on track without burning you out.'}
             </div>
-            <button style={{
+            <button onClick={openWorkout} style={{
               marginTop: 14, padding: '12px 18px', borderRadius: 999, border: 'none',
               background: YLV2_Tokens.amber, color: YLV2_Tokens.ink, cursor: 'pointer',
-              fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 13, fontWeight: 600,
+              fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 13, fontWeight: 700,
               display: 'inline-flex', alignItems: 'center', gap: 8,
-            }}><V2Icon name="play" size={12} color={YLV2_Tokens.ink}/> {t.start}</button>
+            }}><V2Icon name="play" size={12} color={YLV2_Tokens.ink}/> {rtl ? 'התחל ולוג' : 'Start & log'}</button>
           </div>
         </V2Card>
       </div>
 
+      {/* Today's logged workouts */}
+      <div style={{ padding: '20px 22px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+        <div style={{ fontFamily: rtl ? YLV2_Type.heb : YLV2_Type.serif, fontSize: 20, color: YLV2_Tokens.cream, letterSpacing: -0.2 }}>
+          {rtl ? 'האימונים שלך היום' : "Today's workouts"}
+        </div>
+        <button onClick={openWorkout} style={{
+          padding: '8px 14px', borderRadius: 999, border: 'none',
+          background: YLV2_Tokens.amber, color: YLV2_Tokens.ink, cursor: 'pointer',
+          fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 11, fontWeight: 700,
+          display: 'inline-flex', alignItems: 'center', gap: 4,
+        }}><V2Icon name="plus" size={12} color={YLV2_Tokens.ink}/> {rtl ? 'הוסף' : 'Add'}</button>
+      </div>
+      <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {stats.todaysWorkouts.map((w, i) => {
+          const realIdx = store.data.workouts.indexOf(w);
+          return (
+            <V2Card key={i} pad={14} dark style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: 10,
+                background: 'rgba(188,255,0,0.12)',
+                display: 'grid', placeItems: 'center', color: YLV2_Tokens.amber, flexShrink: 0,
+              }}><V2Icon name={typeIcon(w.type)} size={18}/></div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 14, fontWeight: 500, color: YLV2_Tokens.cream }}>
+                  {typeLabel(w.type)}{w.notes ? ` · ${w.notes}` : ''}
+                </div>
+                <div style={{ fontFamily: YLV2_Type.mono, fontSize: 10, color: YLV2_Tokens.creamMute, marginTop: 2 }}>{fmtTime(w.date)}</div>
+              </div>
+              <div style={{ fontFamily: YLV2_Type.serif, fontSize: 16, color: YLV2_Tokens.amber }}>{w.minutes} {t.min}</div>
+              <button onClick={() => store.delWorkout(realIdx)} style={{
+                width: 28, height: 28, borderRadius: 14, border: `1px solid ${YLV2_Tokens.creamHair}`,
+                background: 'transparent', color: YLV2_Tokens.creamMute, cursor: 'pointer',
+                display: 'grid', placeItems: 'center',
+              }}><V2Icon name="x" size={12}/></button>
+            </V2Card>
+          );
+        })}
+        {stats.todaysWorkouts.length === 0 && (
+          <div style={{
+            padding: '18px 16px', borderRadius: 14,
+            background: YLV2_Tokens.inkSoft,
+            border: `1px dashed ${YLV2_Tokens.creamHair}`,
+            textAlign: 'center', fontFamily: rtl ? YLV2_Type.heb : YLV2_Type.serif,
+            fontSize: 15, color: YLV2_Tokens.creamDim, fontStyle: 'italic',
+          }}>
+            {rtl ? 'עוד לא התאמנת היום. גם הליכה של 15 דקות נחשבת.' : "Nothing logged yet. A 15-minute walk counts."}
+          </div>
+        )}
+      </div>
+
       <div style={{ padding: '20px 22px 10px' }}>
         <div style={{ fontFamily: rtl ? YLV2_Type.heb : YLV2_Type.serif, fontSize: 20, color: YLV2_Tokens.cream, letterSpacing: -0.2 }}>
-          {rtl ? 'או בחר בעצמך' : 'Or pick yourself'}
+          {rtl ? 'בחר סוג אימון' : 'Pick a workout type'}
         </div>
       </div>
       <div style={{ padding: '0 16px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
         {[
-          { k: rtl ? 'הליכה' : 'Walk',     i: 'walk' },
-          { k: rtl ? 'ריצה' : 'Run',       i: 'bolt' },
-          { k: rtl ? 'כוח' : 'Strength',   i: 'train' },
-          { k: 'HIIT',                      i: 'flame' },
-          { k: rtl ? 'ניידות' : 'Mobility',i: 'heart' },
-          { k: rtl ? 'אגרוף' : 'Boxing',   i: 'bolt' },
-          { k: rtl ? 'שחיה' : 'Swim',      i: 'drop' },
-          { k: rtl ? 'קצר' : 'Quick',      i: 'clock' },
-          { k: rtl ? 'רגוע' : 'Recovery',  i: 'moon' },
+          { k: rtl ? 'הליכה' : 'Walk',     i: 'walk',    type: 'walk' },
+          { k: rtl ? 'ריצה' : 'Run',       i: 'bolt',    type: 'run' },
+          { k: rtl ? 'כוח' : 'Strength',   i: 'train',   type: 'strength' },
+          { k: 'HIIT',                      i: 'flame',  type: 'hiit' },
+          { k: rtl ? 'ניידות' : 'Mobility',i: 'heart',   type: 'mobility' },
+          { k: rtl ? 'אגרוף' : 'Boxing',   i: 'bolt',    type: 'boxing' },
+          { k: rtl ? 'שחיה' : 'Swim',      i: 'drop',    type: 'swim' },
+          { k: rtl ? 'קצר' : 'Quick',      i: 'clock',   type: 'other' },
+          { k: rtl ? 'רגוע' : 'Recovery',  i: 'moon',    type: 'mobility' },
         ].map((m,i) => (
-          <V2Card key={i} pad={12} dark style={{ textAlign: 'center' }}>
+          <V2Card key={i} pad={12} dark style={{ textAlign: 'center', cursor: 'pointer' }} onClick={openWorkout}>
             <div style={{ margin: '0 auto', width: 34, height: 34, borderRadius: 10, background: 'rgba(233,235,230,0.06)', display: 'grid', placeItems: 'center', color: YLV2_Tokens.amber }}>
               <V2Icon name={m.i} size={18}/>
             </div>
@@ -1260,24 +1546,28 @@ function V2Train({ t, L }) {
   );
 }
 
-function V2Progress({ t, L }) {
+function V2Progress({ t, L, stats, store }) {
   const rtl = L.dir === 'rtl';
-  const stats = [
-    { l: rtl ? 'משקל'         : 'Weight',       v: '93.2', s: '↓ 3.8 ' + t.kg, c: YLV2_Tokens.amber, dark: true },
-    { l: rtl ? 'עקביות'        : 'Consistency', v: '87%',  s: rtl ? '+12% השבוע' : '+12% this week' },
-    { l: rtl ? 'אימונים'       : 'Sessions',    v: '17/20' },
-    { l: rtl ? 'רצף'           : 'Streak',      v: '14',   s: rtl ? 'ימים' : 'days' },
-    { l: rtl ? 'חלבון ממוצע'   : 'Avg protein', v: '128g' },
-    { l: rtl ? 'מים'           : 'Water',       v: '6.8',  s: rtl ? 'כוסות/יום' : 'cups/day' },
-    { l: rtl ? 'שינה'          : 'Sleep',       v: '7h 12m' },
-    { l: rtl ? 'ציון ביטחון'   : 'Confidence',  v: '4.2/5', s: rtl ? '↑ השבוע' : '↑ this week' },
+  const weightStr = stats.latestWeight != null ? (+stats.latestWeight).toFixed(1) : '—';
+  const weightSub = stats.delta > 0 ? `↓ ${stats.delta.toFixed(1)} ${t.kg}` : (stats.delta < 0 ? `↑ ${(-stats.delta).toFixed(1)} ${t.kg}` : (rtl ? 'נקודת התחלה' : 'start'));
+  const consistencyPct = Math.round(stats.progressPct * 100);
+  const sessions7d = store.data.workouts.filter(w => isThisWeek(w.date)).length;
+  const tileStats = [
+    { l: rtl ? 'משקל'        : 'Weight',       v: weightStr, s: weightSub, dark: true },
+    { l: rtl ? 'התקדמות'     : 'To target',    v: `${consistencyPct}%`,  s: stats.targetWeight ? (rtl ? `עד ${stats.targetWeight} ${t.kg}` : `to ${stats.targetWeight} ${t.kg}`) : '—' },
+    { l: rtl ? 'אימונים השבוע' : 'Sessions (wk)', v: `${sessions7d}` },
+    { l: rtl ? 'רצף'          : 'Streak',       v: `${stats.streak}`,   s: rtl ? 'ימים' : 'days' },
+    { l: rtl ? 'חלבון ממוצע'  : 'Avg protein',  v: `${stats.avgProtein}g`, s: rtl ? '7 ימים' : '7d avg' },
+    { l: rtl ? 'מים'          : 'Water',        v: `${stats.avgWater}`, s: rtl ? 'כוסות/יום' : 'cups/day' },
+    { l: rtl ? 'סה״כ אימונים' : 'All sessions', v: `${stats.sessions}` },
+    { l: rtl ? 'יום'          : 'Day',          v: `${stats.dayCount}`, s: `/ ${stats.planDays}` },
   ];
 
   return (
     <div style={{ padding: 'calc(env(safe-area-inset-top) + 64px) 0 calc(env(safe-area-inset-bottom) + 120px)', direction: L.dir, color: YLV2_Tokens.cream }}>
       <div style={{ padding: '0 22px 14px' }}>
         <div style={{ fontFamily: YLV2_Type.mono, fontSize: 10.5, color: YLV2_Tokens.creamMute, letterSpacing: 1.5, textTransform: 'uppercase' }}>
-          23 / 168 {rtl ? 'ימים' : 'days'}
+          {stats.dayCount} / {stats.planDays} {rtl ? 'ימים' : 'days'}
         </div>
         <div style={{ fontFamily: rtl ? YLV2_Type.heb : YLV2_Type.serif, fontSize: 30, color: YLV2_Tokens.cream, letterSpacing: -0.5, marginTop: 6, lineHeight: 1.05 }}>
           {rtl ? <>זה קורה.<br/><em style={{ color: YLV2_Tokens.amber }}>באמת.</em></> : <>It's happening.<br/><em style={{ color: YLV2_Tokens.amber }}>For real.</em></>}
@@ -1285,7 +1575,7 @@ function V2Progress({ t, L }) {
       </div>
 
       <div style={{ padding: '0 16px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-        {stats.map((s,i) => (
+        {tileStats.map((s,i) => (
           <V2Card key={i} pad={14} dark style={s.dark ? { background: YLV2_Tokens.amber, color: YLV2_Tokens.ink, border: 'none' } : {}}>
             <div style={{ fontFamily: YLV2_Type.mono, fontSize: 9.5, color: s.dark ? 'rgba(6,20,20,0.6)' : YLV2_Tokens.creamMute, letterSpacing: 1, textTransform: 'uppercase' }}>{s.l}</div>
             <div style={{ fontFamily: YLV2_Type.serif, fontSize: 28, color: s.dark ? YLV2_Tokens.ink : YLV2_Tokens.cream, lineHeight: 1, marginTop: 8, letterSpacing: -0.3 }}>
@@ -1521,8 +1811,40 @@ function SettingsRow({ label, value, danger, onClick }) {
   );
 }
 
-function V2Settings({ t, L, lang, setLang, mode, setMode, close }) {
+function V2Settings({ t, L, lang, setLang, mode, setMode, store, close }) {
   const rtl = L.dir === 'rtl';
+  const profile = store.data.profile || {};
+
+  const doExport = () => {
+    try {
+      const blob = new Blob([store.exportJSON()], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `yoav-life-v2-${todayKey()}.json`;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) { alert(rtl ? 'ייצוא נכשל' : 'Export failed'); }
+  };
+
+  const doReset = () => {
+    if (confirm(rtl
+      ? 'זה ימחק את כל הנתונים שלך: פרופיל, משקלים, ארוחות, אימונים, מים, צ׳ק-אינים. אין חזרה. להמשיך?'
+      : 'This wipes EVERYTHING: profile, weights, meals, workouts, water, check-ins. No undo. Continue?')) {
+      store.resetAll();
+      close();
+    }
+  };
+
+  const doResetCheckIn = () => {
+    const today = todayKey();
+    const newCheckIns = store.data.checkIns.filter(c => c.date.slice(0,10) !== today);
+    // Hack: re-save with today's check-in stripped. No direct api, so we use saveCheckIn then manipulate.
+    // Simplest: use resetAll pattern via setProfile doesn't help. Add a dedicated path via exportJSON/reload:
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...store.data, checkIns: newCheckIns }));
+      location.reload();
+    } catch (e) {}
+  };
   return (
     <div style={{
       position: 'fixed', inset: 0, background: YLV2_Tokens.ink, zIndex: 65,
@@ -1570,9 +1892,11 @@ function V2Settings({ t, L, lang, setLang, mode, setMode, close }) {
         </SettingsSection>
 
         <SettingsSection label={rtl ? 'פרופיל' : 'Profile'} icon="user">
-          <SettingsRow label={rtl ? 'שם' : 'Name'} value="Yoav"/>
-          <SettingsRow label={rtl ? 'משקל נוכחי' : 'Current weight'} value="93.2 kg"/>
-          <SettingsRow label={rtl ? 'יעד' : 'Target'} value="80 kg"/>
+          <SettingsRow label={rtl ? 'שם' : 'Name'} value={profile.name || '—'}/>
+          <SettingsRow label={rtl ? 'משקל התחלתי' : 'Start weight'} value={profile.startWeight ? `${profile.startWeight} kg` : '—'}/>
+          <SettingsRow label={rtl ? 'משקל נוכחי' : 'Current weight'} value={store.data.weights.length ? `${store.data.weights[store.data.weights.length-1].kg} kg` : (profile.startWeight ? `${profile.startWeight} kg` : '—')}/>
+          <SettingsRow label={rtl ? 'יעד' : 'Target'} value={profile.targetWeight ? `${profile.targetWeight} kg` : '—'}/>
+          <SettingsRow label={rtl ? 'תאריך התחלה' : 'Start date'} value={profile.startDate ? fmtDateHe(profile.startDate) : '—'}/>
         </SettingsSection>
 
         <SettingsSection label={rtl ? 'מצב ברירת מחדל' : 'Default day mode'} icon="clock">
@@ -1604,11 +1928,11 @@ function V2Settings({ t, L, lang, setLang, mode, setMode, close }) {
         </SettingsSection>
 
         <SettingsSection label={rtl ? 'נתונים' : 'Data'} icon="shield">
-          <SettingsRow label={rtl ? 'ייצוא נתונים' : 'Export data'}/>
-          <SettingsRow label={rtl ? 'סנכרון עם Apple Health' : 'Sync with Apple Health'}/>
-          <SettingsRow label={rtl ? 'סנכרון עם Google Fit' : 'Sync with Google Fit'}/>
-          <SettingsRow label={rtl ? 'איפוס צ׳ק-אין היום' : 'Reset today\'s check-in'}/>
-          <SettingsRow label={rtl ? 'מחיקת כל הנתונים' : 'Delete all data'} danger/>
+          <SettingsRow label={rtl ? 'ייצוא נתונים (JSON)' : 'Export data (JSON)'} value={`${store.data.weights.length + store.data.meals.length + store.data.workouts.length + store.data.water.length + store.data.checkIns.length} ${rtl ? 'רשומות' : 'items'}`} onClick={doExport}/>
+          <SettingsRow label={rtl ? 'סנכרון עם Apple Health' : 'Sync with Apple Health'} value={rtl ? 'בקרוב' : 'soon'}/>
+          <SettingsRow label={rtl ? 'סנכרון עם Google Fit' : 'Sync with Google Fit'} value={rtl ? 'בקרוב' : 'soon'}/>
+          <SettingsRow label={rtl ? 'איפוס צ׳ק-אין היום' : 'Reset today\'s check-in'} onClick={doResetCheckIn}/>
+          <SettingsRow label={rtl ? 'מחיקת כל הנתונים' : 'Delete all data'} danger onClick={doReset}/>
         </SettingsSection>
 
         <SettingsSection label={rtl ? 'על המערכת' : 'About'} icon="brain">
@@ -1639,33 +1963,331 @@ function V2Settings({ t, L, lang, setLang, mode, setMode, close }) {
 }
 
 /* ──────────────────────────────────────────────────────────────
+   Onboarding + entry sheets (weight / meal / workout)
+   ────────────────────────────────────────────────────────────── */
+function V2Onboarding({ L, onDone }) {
+  const rtl = L.dir === 'rtl';
+  const store = useStore();
+  const [step, setStep] = React.useState(0);
+  const [name, setName] = React.useState('');
+  const [startWeight, setStartWeight] = React.useState('');
+  const [targetWeight, setTargetWeight] = React.useState('');
+  const [height, setHeight] = React.useState('');
+
+  const steps = [
+    { q: rtl ? 'איך קוראים לך?' : 'What should I call you?',     sub: rtl ? 'השם שלך יופיע בכל הודעה שאשלח לך.' : 'Your name appears in every message I send.' },
+    { q: rtl ? 'המשקל שלך היום?' : 'Your weight today?',          sub: rtl ? 'נקודת ההתחלה. ממנה נמדוד הכל.' : 'Starting point. We measure everything from here.' },
+    { q: rtl ? 'לאן אתה חותר?'   : 'Where are you heading?',      sub: rtl ? 'היעד. לא חובה להיות מדויק — נכוון בדרך.' : 'Your target. Doesn\'t need to be exact — we tune as we go.' },
+    { q: rtl ? 'הגובה שלך?'      : 'Your height?',                sub: rtl ? 'אופציונלי. עוזר לי לחשב מדדים.' : 'Optional. Helps me compute indicators.' },
+  ];
+  const s = steps[step];
+
+  const finish = () => {
+    store.setProfile({
+      name: name.trim() || (rtl ? 'יואב' : 'Yoav'),
+      startWeight: +startWeight || 0,
+      targetWeight: +targetWeight || 0,
+      height: +height || null,
+      startDate: new Date().toISOString(),
+      planDays: 168,
+    });
+    if (+startWeight) store.addWeight(+startWeight);
+    onDone && onDone();
+  };
+
+  const canNext = () => {
+    if (step === 0) return name.trim().length > 0;
+    if (step === 1) return +startWeight > 0;
+    if (step === 2) return +targetWeight > 0;
+    return true;
+  };
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: YLV2_Tokens.ink, zIndex: 80,
+      direction: L.dir, color: YLV2_Tokens.cream,
+      padding: 'calc(env(safe-area-inset-top) + 32px) 22px calc(env(safe-area-inset-bottom) + 32px)',
+      display: 'flex', flexDirection: 'column',
+      overflowY: 'auto',
+    }}>
+      <div style={{ fontFamily: YLV2_Type.mono, fontSize: 10.5, color: YLV2_Tokens.amber, letterSpacing: 2, textTransform: 'uppercase' }}>
+        YOAV · LIFE · V2 · {rtl ? 'התחלה' : 'Setup'}
+      </div>
+      <div style={{ display: 'flex', gap: 6, marginTop: 14 }}>
+        {steps.map((_, i) => (
+          <div key={i} style={{ flex: 1, height: 3, borderRadius: 2, background: i <= step ? YLV2_Tokens.amber : 'rgba(233,235,230,0.14)' }}/>
+        ))}
+      </div>
+
+      <div style={{ fontFamily: rtl ? YLV2_Type.heb : YLV2_Type.serif, fontSize: 34, color: YLV2_Tokens.cream, letterSpacing: -0.5, lineHeight: 1.05, marginTop: 28 }}>
+        {s.q}
+      </div>
+      <div style={{ fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 13.5, color: YLV2_Tokens.creamDim, marginTop: 10, lineHeight: 1.4 }}>
+        {s.sub}
+      </div>
+
+      <div style={{ marginTop: 32 }}>
+        {step === 0 && (
+          <input autoFocus value={name} onChange={e => setName(e.target.value)}
+            placeholder={rtl ? 'השם שלך' : 'Your name'}
+            style={inputStyle(rtl)}/>
+        )}
+        {step === 1 && (
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+            <input autoFocus type="number" inputMode="decimal" value={startWeight} onChange={e => setStartWeight(e.target.value)}
+              placeholder="93.0" style={{ ...inputStyle(rtl), flex: 1, fontSize: 42, fontFamily: YLV2_Type.serif, textAlign: 'center' }}/>
+            <span style={{ fontFamily: YLV2_Type.mono, fontSize: 14, color: YLV2_Tokens.creamMute }}>{rtl ? 'ק״ג' : 'kg'}</span>
+          </div>
+        )}
+        {step === 2 && (
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+            <input autoFocus type="number" inputMode="decimal" value={targetWeight} onChange={e => setTargetWeight(e.target.value)}
+              placeholder="80.0" style={{ ...inputStyle(rtl), flex: 1, fontSize: 42, fontFamily: YLV2_Type.serif, textAlign: 'center' }}/>
+            <span style={{ fontFamily: YLV2_Type.mono, fontSize: 14, color: YLV2_Tokens.creamMute }}>{rtl ? 'ק״ג' : 'kg'}</span>
+          </div>
+        )}
+        {step === 3 && (
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+            <input autoFocus type="number" inputMode="numeric" value={height} onChange={e => setHeight(e.target.value)}
+              placeholder="176" style={{ ...inputStyle(rtl), flex: 1, fontSize: 42, fontFamily: YLV2_Type.serif, textAlign: 'center' }}/>
+            <span style={{ fontFamily: YLV2_Type.mono, fontSize: 14, color: YLV2_Tokens.creamMute }}>cm</span>
+          </div>
+        )}
+      </div>
+
+      <div style={{ marginTop: 'auto', display: 'flex', gap: 10, paddingTop: 24 }}>
+        {step > 0 && (
+          <button onClick={() => setStep(step - 1)} style={secondaryBtn(rtl)}>
+            {rtl ? 'חזור' : 'Back'}
+          </button>
+        )}
+        <button disabled={!canNext()} onClick={() => step < steps.length - 1 ? setStep(step + 1) : finish()} style={{
+          ...primaryBtn(rtl), flex: 1, opacity: canNext() ? 1 : 0.4,
+        }}>
+          {step < steps.length - 1 ? (rtl ? 'המשך' : 'Continue') : (rtl ? 'בנה לי את המערכת' : 'Build my system')}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function inputStyle(rtl) {
+  return {
+    width: '100%',
+    padding: '16px 18px', borderRadius: 14,
+    background: YLV2_Tokens.inkSoft,
+    border: `1px solid ${YLV2_Tokens.creamHair}`,
+    color: YLV2_Tokens.cream,
+    fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans,
+    fontSize: 16, outline: 'none',
+    direction: rtl ? 'rtl' : 'ltr',
+  };
+}
+function primaryBtn(rtl) {
+  return {
+    padding: '16px 22px', borderRadius: 999, border: 'none',
+    background: YLV2_Tokens.amber, color: YLV2_Tokens.ink, cursor: 'pointer',
+    fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans,
+    fontSize: 14, fontWeight: 700, letterSpacing: 0.3,
+  };
+}
+function secondaryBtn(rtl) {
+  return {
+    padding: '16px 22px', borderRadius: 999,
+    background: 'transparent', color: YLV2_Tokens.cream, cursor: 'pointer',
+    border: `1px solid ${YLV2_Tokens.creamHair}`,
+    fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans,
+    fontSize: 14, fontWeight: 600,
+  };
+}
+
+function Sheet({ L, title, onClose, children }) {
+  const rtl = L.dir === 'rtl';
+  return (
+    <div onClick={onClose} style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)',
+      backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)',
+      zIndex: 75, display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        background: YLV2_Tokens.inkElev, color: YLV2_Tokens.cream,
+        borderTopLeftRadius: 24, borderTopRightRadius: 24,
+        border: `1px solid ${YLV2_Tokens.creamHair}`,
+        width: '100%', maxWidth: 480,
+        padding: '18px 22px calc(env(safe-area-inset-bottom) + 22px)',
+        direction: L.dir,
+        boxShadow: '0 -20px 60px rgba(0,0,0,0.5)',
+      }}>
+        <div style={{ width: 40, height: 4, borderRadius: 2, background: YLV2_Tokens.creamHair, margin: '0 auto 14px' }}/>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+          <span style={{ fontFamily: rtl ? YLV2_Type.heb : YLV2_Type.serif, fontSize: 22, color: YLV2_Tokens.cream, letterSpacing: -0.3 }}>{title}</span>
+          <button onClick={onClose} style={{
+            width: 34, height: 34, borderRadius: 17, border: `1px solid ${YLV2_Tokens.creamHair}`,
+            background: 'transparent', color: YLV2_Tokens.cream, cursor: 'pointer',
+            display: 'grid', placeItems: 'center',
+          }}><V2Icon name="x" size={14}/></button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function WeightSheet({ L, onClose }) {
+  const rtl = L.dir === 'rtl';
+  const store = useStore();
+  const [v, setV] = React.useState('');
+  const submit = () => { if (+v > 0) { store.addWeight(+v); onClose(); } };
+  return (
+    <Sheet L={L} title={rtl ? 'משקל היום' : "Today's weight"} onClose={onClose}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 14 }}>
+        <input autoFocus type="number" inputMode="decimal" value={v} onChange={e => setV(e.target.value)}
+          placeholder="93.0" style={{ ...inputStyle(rtl), flex: 1, fontSize: 42, fontFamily: YLV2_Type.serif, textAlign: 'center' }}/>
+        <span style={{ fontFamily: YLV2_Type.mono, fontSize: 14, color: YLV2_Tokens.creamMute }}>{rtl ? 'ק״ג' : 'kg'}</span>
+      </div>
+      <button onClick={submit} disabled={!(+v > 0)} style={{ ...primaryBtn(rtl), width: '100%', opacity: +v > 0 ? 1 : 0.4 }}>
+        {rtl ? 'שמור' : 'Save'}
+      </button>
+    </Sheet>
+  );
+}
+
+function MealSheet({ L, onClose }) {
+  const rtl = L.dir === 'rtl';
+  const store = useStore();
+  const [name, setName] = React.useState('');
+  const [kcal, setKcal] = React.useState('');
+  const [protein, setProtein] = React.useState('');
+  const [slot, setSlot] = React.useState('lunch');
+  const slots = rtl
+    ? [['breakfast','בוקר'],['lunch','צהריים'],['dinner','ערב'],['snack','נשנוש']]
+    : [['breakfast','Breakfast'],['lunch','Lunch'],['dinner','Dinner'],['snack','Snack']];
+  const submit = () => {
+    if (!name.trim() || !(+kcal > 0)) return;
+    store.addMeal({ name: name.trim(), kcal: +kcal, protein: +protein || 0, slot });
+    onClose();
+  };
+  return (
+    <Sheet L={L} title={rtl ? 'ארוחה חדשה' : 'New meal'} onClose={onClose}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <input autoFocus value={name} onChange={e => setName(e.target.value)}
+          placeholder={rtl ? 'מה אכלת? (למשל: חומוס + פיתה)' : 'What did you eat?'}
+          style={inputStyle(rtl)}/>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <input type="number" inputMode="numeric" value={kcal} onChange={e => setKcal(e.target.value)}
+            placeholder={rtl ? 'קלוריות' : 'kcal'} style={{ ...inputStyle(rtl), flex: 1 }}/>
+          <input type="number" inputMode="numeric" value={protein} onChange={e => setProtein(e.target.value)}
+            placeholder={rtl ? 'חלבון (g)' : 'protein (g)'} style={{ ...inputStyle(rtl), flex: 1 }}/>
+        </div>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {slots.map(([k, l]) => (
+            <button key={k} onClick={() => setSlot(k)} style={{
+              padding: '9px 14px', borderRadius: 999,
+              border: `1px solid ${slot === k ? YLV2_Tokens.amber : YLV2_Tokens.creamHair}`,
+              background: slot === k ? 'rgba(188,255,0,0.14)' : 'transparent',
+              color: slot === k ? YLV2_Tokens.amber : YLV2_Tokens.creamDim,
+              fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 12, fontWeight: 600,
+              cursor: 'pointer',
+            }}>{l}</button>
+          ))}
+        </div>
+        <button onClick={submit} disabled={!(name.trim() && +kcal > 0)} style={{
+          ...primaryBtn(rtl), width: '100%', marginTop: 4, opacity: (name.trim() && +kcal > 0) ? 1 : 0.4,
+        }}>{rtl ? 'הוסף' : 'Add meal'}</button>
+      </div>
+    </Sheet>
+  );
+}
+
+function WorkoutSheet({ L, onClose }) {
+  const rtl = L.dir === 'rtl';
+  const store = useStore();
+  const types = rtl
+    ? [['walk','הליכה'],['run','ריצה'],['strength','כוח'],['hiit','HIIT'],['mobility','ניידות'],['boxing','אגרוף'],['swim','שחיה'],['other','אחר']]
+    : [['walk','Walk'],['run','Run'],['strength','Strength'],['hiit','HIIT'],['mobility','Mobility'],['boxing','Boxing'],['swim','Swim'],['other','Other']];
+  const [type, setType] = React.useState('walk');
+  const [minutes, setMinutes] = React.useState('');
+  const [notes, setNotes] = React.useState('');
+  const submit = () => {
+    if (!(+minutes > 0)) return;
+    store.addWorkout({ type, minutes: +minutes, notes: notes.trim() || undefined });
+    onClose();
+  };
+  return (
+    <Sheet L={L} title={rtl ? 'אימון' : 'Workout'} onClose={onClose}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {types.map(([k, l]) => (
+            <button key={k} onClick={() => setType(k)} style={{
+              padding: '9px 14px', borderRadius: 999,
+              border: `1px solid ${type === k ? YLV2_Tokens.amber : YLV2_Tokens.creamHair}`,
+              background: type === k ? 'rgba(188,255,0,0.14)' : 'transparent',
+              color: type === k ? YLV2_Tokens.amber : YLV2_Tokens.creamDim,
+              fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+            }}>{l}</button>
+          ))}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+          <input autoFocus type="number" inputMode="numeric" value={minutes} onChange={e => setMinutes(e.target.value)}
+            placeholder="25" style={{ ...inputStyle(rtl), flex: 1, fontSize: 32, fontFamily: YLV2_Type.serif, textAlign: 'center' }}/>
+          <span style={{ fontFamily: YLV2_Type.mono, fontSize: 14, color: YLV2_Tokens.creamMute }}>{rtl ? 'דקות' : 'min'}</span>
+        </div>
+        <input value={notes} onChange={e => setNotes(e.target.value)}
+          placeholder={rtl ? 'הערות (אופציונלי)' : 'Notes (optional)'}
+          style={inputStyle(rtl)}/>
+        <button onClick={submit} disabled={!(+minutes > 0)} style={{
+          ...primaryBtn(rtl), width: '100%', marginTop: 4, opacity: +minutes > 0 ? 1 : 0.4,
+        }}>{rtl ? 'שמור אימון' : 'Save workout'}</button>
+      </div>
+    </Sheet>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────
    App shell — wires screens + overlays + language
    ────────────────────────────────────────────────────────────── */
-function App() {
-  const [lang, setLang] = React.useState('he');
+function AppInner() {
+  const store = useStore();
+  const lang = store.data.lang || 'he';
+  const setLang = (l) => store.setLang(l);
   const L = YLV2_STRINGS[lang];
   const t = L;
 
   const [tab, setTab] = React.useState('today');
-  const [mode, setMode] = React.useState('meetings');
-  const [state, setState] = React.useState({ checkedIn: true });
-  const [overlay, setOverlay] = React.useState(null); // 'sos' | 'notifs' | 'modes' | 'settings' | null
+  const mode = store.data.mode || 'workday';
+  const setMode = (m) => store.setMode(m);
+  const [overlay, setOverlay] = React.useState(null); // 'sos' | 'notifs' | 'modes' | 'settings' | 'weight' | 'meal' | 'workout' | null
 
-  // Keep <html> dir/lang in sync so RTL is honored natively by the browser
+  const stats = deriveStats(store.data);
+
+  // Keep <html> dir/lang in sync so RTL is honored natively by the browser.
+  // IMPORTANT: runs on every render order — must sit above the onboarding early-return.
   React.useEffect(() => {
     document.documentElement.setAttribute('dir', L.dir);
     document.documentElement.setAttribute('lang', lang);
   }, [lang, L.dir]);
 
+  // Onboarding gate — show first-run flow until a profile exists
+  if (!store.data.profile) {
+    return <V2Onboarding L={L} onDone={() => {}}/>;
+  }
+
+  const openers = {
+    openSOS:     () => setOverlay('sos'),
+    openNotifs:  () => setOverlay('notifs'),
+    openMode:    () => setOverlay('modes'),
+    openWeight:  () => setOverlay('weight'),
+    openMeal:    () => setOverlay('meal'),
+    openWorkout: () => setOverlay('workout'),
+  };
+
   const screen = (() => {
     switch (tab) {
-      case 'today': return <V2Today t={t} L={L} state={state} setState={setState}
-                              openSOS={() => setOverlay('sos')} openNotifs={() => setOverlay('notifs')}
-                              openMode={() => setOverlay('modes')} mode={mode}/>;
-      case 'food':  return <V2Food  t={t} L={L}/>;
-      case 'train': return <V2Train t={t} L={L}/>;
-      case 'prog':  return <V2Progress t={t} L={L}/>;
-      case 'ai':    return <V2AI t={t} L={L}/>;
+      case 'today': return <V2Today t={t} L={L} stats={stats} store={store} mode={mode} {...openers}/>;
+      case 'food':  return <V2Food  t={t} L={L} stats={stats} store={store} {...openers}/>;
+      case 'train': return <V2Train t={t} L={L} stats={stats} store={store} {...openers}/>;
+      case 'prog':  return <V2Progress t={t} L={L} stats={stats} store={store}/>;
+      case 'ai':    return <V2AI t={t} L={L} stats={stats}/>;
       default: return null;
     }
   })();
@@ -1717,9 +2339,16 @@ function App() {
       {overlay === 'sos'      && <V2SOS t={t} L={L} close={() => setOverlay(null)}/>}
       {overlay === 'notifs'   && <V2Notifications t={t} L={L} close={() => setOverlay(null)}/>}
       {overlay === 'modes'    && <V2ModePicker t={t} L={L} active={mode} setActive={setMode} onClose={() => setOverlay(null)}/>}
-      {overlay === 'settings' && <V2Settings t={t} L={L} lang={lang} setLang={setLang} mode={mode} setMode={setMode} close={() => setOverlay(null)}/>}
+      {overlay === 'settings' && <V2Settings t={t} L={L} lang={lang} setLang={setLang} mode={mode} setMode={setMode} store={store} close={() => setOverlay(null)}/>}
+      {overlay === 'weight'   && <WeightSheet L={L} onClose={() => setOverlay(null)}/>}
+      {overlay === 'meal'     && <MealSheet L={L} onClose={() => setOverlay(null)}/>}
+      {overlay === 'workout'  && <WorkoutSheet L={L} onClose={() => setOverlay(null)}/>}
     </div>
   );
+}
+
+function App() {
+  return <StoreProvider><AppInner/></StoreProvider>;
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
