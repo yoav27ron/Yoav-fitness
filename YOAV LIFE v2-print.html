@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>YOAV LIFE v2 — print</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..800;1,9..144,300..800&family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&family=Frank+Ruhl+Libre:wght@400;500;700&family=Heebo:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+  html, body { margin: 0; padding: 0; background: #061414; font-family: 'Heebo','Geist',-apple-system,system-ui,sans-serif; -webkit-font-smoothing: antialiased; color: #E9EBE6; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  *, *::before, *::after { box-sizing: border-box; }
+  button { font-family: inherit; }
+  em { font-style: italic; }
+  ::-webkit-scrollbar { width: 0; height: 0; }
+
+  .print-page {
+    width: 100%;
+    min-height: 100vh;
+    padding: 32px 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+    page-break-after: always;
+    break-after: page;
+    background: #061414;
+  }
+  .print-page:last-child { page-break-after: auto; break-after: auto; }
+  .page-caption {
+    width: 100%; max-width: 920px;
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-family: 'Geist Mono', monospace;
+    color: rgba(233,235,230,0.55);
+    font-size: 11px; letter-spacing: 2px; text-transform: uppercase;
+  }
+  .page-title {
+    font-family: 'Frank Ruhl Libre','Fraunces', serif;
+    font-size: 30px; color: #E9EBE6; letter-spacing: -0.4px;
+  }
+  .page-title em { color: #BCFF00; font-style: italic; }
+  .phones {
+    display: flex; gap: 24px; justify-content: center; flex-wrap: wrap;
+  }
+
+  @page { size: A4 portrait; margin: 0; }
+  @media print {
+    html, body { background: #061414 !important; }
+    .print-page { padding: 24px 18px; min-height: auto; height: 100vh; }
+    .no-print { display: none !important; }
+  }
+</style>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="ios-frame.jsx"></script>
+<script type="text/babel" src="v2/i18n.jsx"></script>
+<script type="text/babel" src="v2/atoms.jsx"></script>
+<script type="text/babel" src="v2/screens-rlp.jsx"></script>
+<script type="text/babel" src="v2/screens-today.jsx"></script>
+<script type="text/babel" src="v2/screens-rest.jsx"></script>
+
+<script type="text/babel" data-presets="react">
+function PrintPhone({ children }) {
+  return (
+    <div style={{ transform: 'scale(0.78)', transformOrigin: 'top center', margin: '-60px 0' }}>
+      <IOSDevice dark width={402} height={874}>
+        <div style={{ position: 'relative', minHeight: '100%', background: '#061414', overflow: 'hidden' }}>
+          {children}
+        </div>
+      </IOSDevice>
+    </div>
+  );
+}
+
+function PrintPage({ num, label, title, children }) {
+  return (
+    <section className="print-page">
+      <div className="page-caption">
+        <span>YOAV · LIFE · V2  · {label}</span>
+        <span>0{num} / 09</span>
+      </div>
+      <div className="page-title" style={{ width: '100%', maxWidth: 920, textAlign: 'right' }} dangerouslySetInnerHTML={{__html: title}}/>
+      <div className="phones">{children}</div>
+    </section>
+  );
+}
+
+function App() {
+  const L = YLV2_STRINGS.he;
+  const t = L;
+
+  // Force checkedIn on a prepared state for all screens
+  const state = { checkedIn: true };
+  const setState = () => {};
+  const noop = () => {};
+
+  return (
+    <div>
+      {/* Cover */}
+      <section className="print-page" style={{ justifyContent: 'center' }}>
+        <div className="page-caption"><span>YOAV · LIFE · V2</span><span>COVER</span></div>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', width: '100%', maxWidth: 920 }}>
+          <div style={{ fontFamily: 'Geist Mono', fontSize: 12, color: '#BCFF00', letterSpacing: 3, textTransform: 'uppercase' }}>
+            Personal OS · v2
+          </div>
+          <div style={{ fontFamily: 'Frank Ruhl Libre', fontSize: 96, color: '#E9EBE6', lineHeight: 0.95, letterSpacing: -2, marginTop: 20, textAlign: 'right' }}>
+            יואב.<br/>
+            <em style={{ color: '#BCFF00', fontStyle: 'italic' }}>החיים שלך.</em>
+          </div>
+          <div style={{ fontFamily: 'Heebo', fontSize: 18, color: 'rgba(233,235,230,0.7)', marginTop: 28, textAlign: 'right', lineHeight: 1.5, maxWidth: 620, marginLeft: 'auto' }}>
+            מערכת הפעלה אישית לגבר עצמאי — גוף, אוכל, אימון, פוקוס, ביצועים עסקיים. הכל קשור. הכל אחד.
+          </div>
+          <div style={{ marginTop: 40, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            {['#BCFF00','#061414','#96998C','#D2D3CE','#E9EBE6'].map(c => (
+              <div key={c} style={{ width: 52, height: 52, borderRadius: 10, background: c, border: c === '#061414' ? '1px solid rgba(233,235,230,0.2)' : 'none' }}/>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* 01 Today + Mode */}
+      <PrintPage num={1} label="היום · Today" title="בוקר טוב, <em>יואב.</em> היום יש לך מצב.">
+        <PrintPhone>
+          <div style={{ minHeight: 760, overflow: 'hidden' }}>
+            <V2Today t={t} L={L} go={noop} state={state} setState={setState}
+                     openSOS={noop} openNotifs={noop} openMode={noop} mode="meetings"/>
+          </div>
+          <V2TabBar tab="today" setTab={noop} t={t} L={L}/>
+        </PrintPhone>
+      </PrintPage>
+
+      {/* 02 Mode picker */}
+      <PrintPage num={2} label="Real Life Performance" title="9 מצבי יום. <em>הגוף והעסק — מערכת אחת.</em>">
+        <PrintPhone>
+          <V2ModePicker t={t} L={L} active="meetings" setActive={noop} onClose={noop}/>
+        </PrintPhone>
+      </PrintPage>
+
+      {/* 03 Notifications */}
+      <PrintPage num={3} label="מרכז התראות" title="רק מה שחשוב. <em>לעולם לא רעש.</em>">
+        <PrintPhone>
+          <V2Notifications t={t} L={L} close={noop}/>
+        </PrintPhone>
+      </PrintPage>
+
+      {/* 04 Food */}
+      <PrintPage num={4} label="אוכל · Food" title="אוכל לחיים אמיתיים, <em>לא לדיאטה.</em>">
+        <PrintPhone>
+          <div style={{ minHeight: 760, overflow: 'hidden' }}>
+            <V2Food t={t} L={L} go={noop}/>
+          </div>
+          <V2TabBar tab="food" setTab={noop} t={t} L={L}/>
+        </PrintPhone>
+      </PrintPage>
+
+      {/* 05 Train */}
+      <PrintPage num={5} label="אימון · Train" title="תתאמן בהתאם ליום <em>שיש לך.</em>">
+        <PrintPhone>
+          <div style={{ minHeight: 760, overflow: 'hidden' }}>
+            <V2Train t={t} L={L}/>
+          </div>
+          <V2TabBar tab="train" setTab={noop} t={t} L={L}/>
+        </PrintPhone>
+      </PrintPage>
+
+      {/* 06 Progress */}
+      <PrintPage num={6} label="התקדמות" title="23 יום. <em>זה קורה באמת.</em>">
+        <PrintPhone>
+          <div style={{ minHeight: 760, overflow: 'hidden' }}>
+            <V2Progress t={t} L={L}/>
+          </div>
+          <V2TabBar tab="prog" setTab={noop} t={t} L={L}/>
+        </PrintPhone>
+      </PrintPage>
+
+      {/* 07 AI */}
+      <PrintPage num={7} label="יואב AI" title="דבר איתו. <em>הוא זוכר הכל.</em>">
+        <PrintPhone>
+          <div style={{ minHeight: 760, overflow: 'hidden' }}>
+            <V2AI t={t} L={L}/>
+          </div>
+          <V2TabBar tab="ai" setTab={noop} t={t} L={L}/>
+        </PrintPhone>
+      </PrintPage>
+
+      {/* 08 SOS */}
+      <PrintPage num={8} label="SOS · חירום" title="יואב, מה <em>באמת</em> קורה עכשיו?">
+        <PrintPhone>
+          <V2SOS t={t} L={L} close={noop}/>
+        </PrintPhone>
+      </PrintPage>
+    </div>
+  );
+}
+
+function boot() {
+  ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+}
+boot();
+
+// Auto-print after fonts and render are ready
+(async () => {
+  try { if (document.fonts && document.fonts.ready) await document.fonts.ready; } catch (e) {}
+  await new Promise(r => setTimeout(r, 1500));
+  if (!location.search.includes('noprint')) window.print();
+})();
+</script>
+</body>
+</html>
