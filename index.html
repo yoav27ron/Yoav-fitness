@@ -347,15 +347,20 @@ const YLV2_STRINGS = {
    ────────────────────────────────────────────────────────────── */
 const STORAGE_KEY = 'yoav_life_v2_data';
 const EMPTY_DATA = {
-  version: 1,
+  version: 2,
   profile: null,   // { name, startWeight, targetWeight, startDate, height, age }
   mode: 'workday',
   lang: 'he',
   weights: [],     // [{ date: ISO, kg: number }]
-  meals: [],       // [{ date: ISO, name, kcal, protein, slot: 'breakfast'|'lunch'|'dinner'|'snack' }]
+  meals: [],       // [{ date: ISO, name, kcal, protein, slot }]
   workouts: [],    // [{ date: ISO, type, minutes, notes? }]
-  water: [],       // [{ date: ISO }]  one entry per cup
+  water: [],       // [{ date: ISO }]
   checkIns: [],    // [{ date: ISO, energy, mood, sore, sleep, stress, cravings, time }]
+  dislikes: [],    // string[] — ingredients the user avoids
+  apiKey: '',      // Claude API key (user-supplied, stays in localStorage)
+  journal: [],     // [{ date: ISO, text, analysis? }]
+  googleFit: null, // { accessToken, expiresAt, clientId }
+  googleCal: null, // same shape
 };
 
 function loadData() {
@@ -388,6 +393,14 @@ function StoreProvider({ children }) {
     addWater:   ()      => setData(d => ({ ...d, water: [...d.water, { date: new Date().toISOString() }] })),
     removeWater: ()     => setData(d => ({ ...d, water: d.water.slice(0, -1) })),
     saveCheckIn: (c)    => setData(d => ({ ...d, checkIns: [...d.checkIns.filter(x => x.date.slice(0,10) !== new Date().toISOString().slice(0,10)), { date: new Date().toISOString(), ...c }] })),
+    addDislike: (s)     => setData(d => { const v = (s||'').trim(); if (!v || (d.dislikes||[]).includes(v)) return d; return { ...d, dislikes: [...(d.dislikes||[]), v] }; }),
+    removeDislike: (s)  => setData(d => ({ ...d, dislikes: (d.dislikes||[]).filter(x => x !== s) })),
+    setApiKey: (k)      => setData(d => ({ ...d, apiKey: (k||'').trim() })),
+    addJournal: (text)  => setData(d => ({ ...d, journal: [...(d.journal||[]), { date: new Date().toISOString(), text }] })),
+    setJournalAnalysis: (idx, analysis) => setData(d => ({ ...d, journal: (d.journal||[]).map((j, i) => i === idx ? { ...j, analysis } : j) })),
+    delJournal: (idx)   => setData(d => ({ ...d, journal: (d.journal||[]).filter((_, i) => i !== idx) })),
+    setGoogleFit: (obj) => setData(d => ({ ...d, googleFit: obj })),
+    setGoogleCal: (obj) => setData(d => ({ ...d, googleCal: obj })),
     resetAll:   ()      => { clearData(); setData({ ...EMPTY_DATA }); },
     exportJSON: ()      => JSON.stringify(data, null, 2),
   }), [data]);
@@ -578,9 +591,8 @@ function V2Today({ t, L, stats, store, mode, openSOS, openNotifs, openMode, open
   const profile = store.data.profile || {};
   const displayName = profile.name || t.name;
 
-  if (!stats.didCheckInToday) {
-    return <V2CheckIn t={t} L={L} onDone={(r) => store.saveCheckIn(r)} rtl={rtl}/>;
-  }
+  // Check-in is now a dismissible banner, not a gate — the plan + coaching stays visible below.
+  const [showCheckIn, setShowCheckIn] = React.useState(false);
 
   // Sparkline from real weight entries (fall back gracefully when there are 0/1 points)
   const W = 300, H = 60;
@@ -632,6 +644,41 @@ function V2Today({ t, L, stats, store, mode, openSOS, openNotifs, openMode, open
           <V2Icon name={rtl ? 'chevL' : 'chev'} size={14} color={YLV2_Tokens.creamMute}/>
         </button>
       </div>
+
+      {/* Morning check-in CTA (shown only when not done today) */}
+      {!stats.didCheckInToday && (
+        <div style={{ padding: '12px 16px 0' }}>
+          <button onClick={() => setShowCheckIn(true)} style={{
+            width: '100%', padding: '14px 16px', borderRadius: 16,
+            background: YLV2_Tokens.amber, color: YLV2_Tokens.ink, border: 'none', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+            fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, textAlign: rtl ? 'right' : 'left',
+          }}>
+            <div>
+              <div style={{ fontFamily: YLV2_Type.mono, fontSize: 10, letterSpacing: 1.2, textTransform: 'uppercase', opacity: 0.7 }}>
+                {rtl ? 'צ׳ק-אין בוקר' : 'Morning check-in'}
+              </div>
+              <div style={{ fontFamily: rtl ? YLV2_Type.heb : YLV2_Type.serif, fontSize: 18, marginTop: 3 }}>
+                {t.checkIn} <span style={{ opacity: 0.5, fontSize: 13 }}>· 30s</span>
+              </div>
+            </div>
+            <V2Icon name="play" size={18} color={YLV2_Tokens.ink}/>
+          </button>
+        </div>
+      )}
+
+      {/* Full-screen check-in overlay */}
+      {showCheckIn && (
+        <div style={{ position: 'fixed', inset: 0, background: YLV2_Tokens.ink, zIndex: 72, overflowY: 'auto', direction: L.dir }}>
+          <button onClick={() => setShowCheckIn(false)} style={{
+            position: 'fixed', top: 'calc(env(safe-area-inset-top) + 12px)', [rtl ? 'right' : 'left']: 14,
+            width: 36, height: 36, borderRadius: 18, border: `1px solid ${YLV2_Tokens.creamHair}`,
+            background: YLV2_Tokens.inkSoft, color: YLV2_Tokens.cream, cursor: 'pointer',
+            display: 'grid', placeItems: 'center', zIndex: 73,
+          }}><V2Icon name="x" size={16}/></button>
+          <V2CheckIn t={t} L={L} onDone={(r) => { store.saveCheckIn(r); setShowCheckIn(false); }} rtl={rtl}/>
+        </div>
+      )}
 
       <div style={{ padding: '14px 16px 4px' }}>
         <V2ModeCard t={t} L={L} modeKey={mode} onChange={openMode}/>
@@ -1269,13 +1316,14 @@ function V2Notifications({ t, L, close }) {
 /* ──────────────────────────────────────────────────────────────
    Food, Train, Progress, AI
    ────────────────────────────────────────────────────────────── */
-function V2Food({ t, L, stats, store, openMeal }) {
+function V2Food({ t, L, stats, store, openMeal, openPhotoMeal, openProductScan }) {
   const rtl = L.dir === 'rtl';
   const dailyTarget = 1900;   // placeholder daily kcal goal
   const used = stats.todaysKcal;
   const left = Math.max(0, dailyTarget - used);
   const proteinGoal = 150;    // placeholder daily protein goal
   const proteinLeft = Math.max(0, proteinGoal - stats.todaysProtein);
+  const allowedRecipes = filterRecipes(RECIPES, store.data.dislikes || []);
   return (
     <div style={{ padding: 'calc(env(safe-area-inset-top) + 64px) 0 calc(env(safe-area-inset-bottom) + 120px)', direction: L.dir, color: YLV2_Tokens.cream }}>
       <div style={{ padding: '0 22px 14px' }}>
@@ -1313,10 +1361,10 @@ function V2Food({ t, L, stats, store, openMeal }) {
 
       <div style={{ padding: '12px 16px', display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 6 }}>
         {[
-          { icon: 'plus',   l: rtl ? 'הוסף'   : 'Add',    onClick: openMeal, primary: true },
-          { icon: 'drop',   l: rtl ? 'כוס מים' : 'Water', onClick: () => store.addWater() },
-          { icon: 'cam',    l: rtl ? 'צילום' : 'Photo',   onClick: openMeal },
-          { icon: 'fridge', l: rtl ? 'מקרר'   : 'Fridge', onClick: openMeal },
+          { icon: 'plus',   l: rtl ? 'הוסף ידני' : 'Manual', onClick: openMeal, primary: true },
+          { icon: 'cam',    l: rtl ? 'צלם ארוחה' : 'Photo',  onClick: openPhotoMeal },
+          { icon: 'fridge', l: rtl ? 'סריקת מוצר' : 'Scan',  onClick: openProductScan },
+          { icon: 'drop',   l: rtl ? 'כוס מים' : 'Water',    onClick: () => store.addWater() },
         ].map((a,i) => (
           <button key={i} onClick={a.onClick} style={{
             padding: '14px 6px', borderRadius: 14,
@@ -1409,7 +1457,12 @@ function V2Food({ t, L, stats, store, openMeal }) {
             {rtl ? 'הכללים שלך' : 'Your rules'}
           </div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
-            {(rtl ? ['לא עגבניות','לא זיתים','לא כוסברה','אין חלב אחרי 20:00'] : ['no tomatoes','no olives','no cilantro','no dairy after 20:00']).map(r => (
+            {(store.data.dislikes || []).length === 0 && (
+              <span style={{ fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 12, color: YLV2_Tokens.creamMute, fontStyle: 'italic' }}>
+                {rtl ? 'עוד לא הגדרת מוצרים שאסורים לך — תיגש להגדרות ⚙' : "No dislikes set yet — add them in Settings ⚙"}
+              </span>
+            )}
+            {(store.data.dislikes || []).map(r => (
               <span key={r} style={{
                 padding: '5px 10px', borderRadius: 999,
                 background: 'rgba(229,107,90,0.15)', color: '#F2B9AF',
@@ -1418,6 +1471,64 @@ function V2Food({ t, L, stats, store, openMeal }) {
             ))}
           </div>
         </V2Card>
+      </div>
+
+      {/* Recipe catalog — filtered by dislikes, with substitutions */}
+      <div style={{ padding: '12px 22px 8px' }}>
+        <div style={{ fontFamily: rtl ? YLV2_Type.heb : YLV2_Type.serif, fontSize: 20, color: YLV2_Tokens.cream, letterSpacing: -0.2 }}>
+          {rtl ? 'מתכונים מומלצים לך' : 'Recipes for you'}
+        </div>
+        <div style={{ fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 12, color: YLV2_Tokens.creamDim, marginTop: 4 }}>
+          {rtl
+            ? `${allowedRecipes.length} מתכונים שמתאימים לך — מסוננים לפי מה שלא אוכל`
+            : `${allowedRecipes.length} recipes that fit — filtered against your dislikes`}
+        </div>
+      </div>
+      <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {allowedRecipes.slice(0, 10).map(r => (
+          <V2Card key={r.id} pad={14} dark>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 14, fontWeight: 600, color: YLV2_Tokens.cream }}>
+                  {rtl ? r.he : r.en}
+                </div>
+                <div style={{ fontFamily: YLV2_Type.mono, fontSize: 10, color: YLV2_Tokens.creamMute, marginTop: 3 }}>
+                  {r.kcal} kcal · {r.protein}g P · {r.minutes} {t.min}
+                </div>
+              </div>
+              <div style={{ fontFamily: YLV2_Type.serif, fontSize: 18, color: YLV2_Tokens.amber }}>{r.kcal}</div>
+            </div>
+            {r.swaps && r.swaps.length > 0 && (
+              <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 10, background: 'rgba(188,255,0,0.06)', border: '1px dashed rgba(188,255,0,0.22)', fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 11.5, color: YLV2_Tokens.amber }}>
+                {rtl ? 'החלפות: ' : 'Swaps: '}
+                {r.swaps.map((s, i) => (
+                  <span key={i}>{i > 0 ? ' · ' : ''}{s.from} → <strong>{s.to}</strong></span>
+                ))}
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+              <a href={ytWatchSearchUrl(r.ytq)} target="_blank" rel="noreferrer" style={{
+                flex: 1, padding: '10px 14px', borderRadius: 999,
+                background: 'transparent', border: `1px solid ${YLV2_Tokens.creamHair}`,
+                color: YLV2_Tokens.cream, textAlign: 'center', textDecoration: 'none',
+                fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 12, fontWeight: 600,
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              }}>
+                <V2Icon name="play" size={12} color={YLV2_Tokens.amber}/> {rtl ? 'צפה ביוטיוב' : 'Watch on YouTube'}
+              </a>
+              <button onClick={() => store.addMeal({ name: rtl ? r.he : r.en, kcal: r.kcal, protein: r.protein, slot: 'lunch' })} style={{
+                padding: '10px 14px', borderRadius: 999, border: 'none',
+                background: YLV2_Tokens.amber, color: YLV2_Tokens.ink, cursor: 'pointer',
+                fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 12, fontWeight: 700,
+              }}>{rtl ? 'הוסף כארוחה' : 'Log as meal'}</button>
+            </div>
+          </V2Card>
+        ))}
+        {allowedRecipes.length === 0 && (
+          <div style={{ padding: '20px', borderRadius: 14, background: YLV2_Tokens.inkSoft, border: `1px dashed ${YLV2_Tokens.creamHair}`, textAlign: 'center', color: YLV2_Tokens.creamDim, fontStyle: 'italic' }}>
+            {rtl ? 'הגבלות שהוגדרו חוסמות את כל המתכונים. נסה להוריד כמה מהרשימה בהגדרות.' : 'Your dislike list blocks every recipe. Try trimming it in Settings.'}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1533,14 +1644,29 @@ function V2Train({ t, L, stats, store, openWorkout }) {
           { k: rtl ? 'שחיה' : 'Swim',      i: 'drop',    type: 'swim' },
           { k: rtl ? 'קצר' : 'Quick',      i: 'clock',   type: 'other' },
           { k: rtl ? 'רגוע' : 'Recovery',  i: 'moon',    type: 'mobility' },
-        ].map((m,i) => (
-          <V2Card key={i} pad={12} dark style={{ textAlign: 'center', cursor: 'pointer' }} onClick={openWorkout}>
-            <div style={{ margin: '0 auto', width: 34, height: 34, borderRadius: 10, background: 'rgba(233,235,230,0.06)', display: 'grid', placeItems: 'center', color: YLV2_Tokens.amber }}>
-              <V2Icon name={m.i} size={18}/>
-            </div>
-            <div style={{ fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 12, fontWeight: 500, color: YLV2_Tokens.cream, marginTop: 8 }}>{m.k}</div>
-          </V2Card>
-        ))}
+        ].map((m,i) => {
+          const vid = WORKOUT_VIDEOS[m.type];
+          return (
+            <V2Card key={i} pad={12} dark style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <button onClick={openWorkout} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'inherit', padding: 0 }}>
+                <div style={{ margin: '0 auto', width: 34, height: 34, borderRadius: 10, background: 'rgba(233,235,230,0.06)', display: 'grid', placeItems: 'center', color: YLV2_Tokens.amber }}>
+                  <V2Icon name={m.i} size={18}/>
+                </div>
+                <div style={{ fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 12, fontWeight: 500, color: YLV2_Tokens.cream, marginTop: 8 }}>{m.k}</div>
+              </button>
+              {vid && (
+                <a href={ytWatchSearchUrl(vid.ytq)} target="_blank" rel="noreferrer" style={{
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+                  padding: '5px 8px', borderRadius: 999, textDecoration: 'none',
+                  background: 'rgba(188,255,0,0.1)', color: YLV2_Tokens.amber,
+                  fontFamily: YLV2_Type.mono, fontSize: 9, letterSpacing: 0.5, fontWeight: 600,
+                }} onClick={(e) => e.stopPropagation()}>
+                  <V2Icon name="play" size={9} color={YLV2_Tokens.amber}/> YT
+                </a>
+              )}
+            </V2Card>
+          );
+        })}
       </div>
     </div>
   );
@@ -1604,9 +1730,30 @@ function V2Progress({ t, L, stats, store }) {
   );
 }
 
-function V2AI({ t, L }) {
+function V2AI({ t, L, stats }) {
   const rtl = L.dir === 'rtl';
+  const store = useStore();
+  const apiKey = store.data.apiKey;
   const [draft, setDraft] = React.useState('');
+  const [journalDraft, setJournalDraft] = React.useState('');
+  const [analyzingIdx, setAnalyzingIdx] = React.useState(null);
+  const [analyzeErr, setAnalyzeErr] = React.useState('');
+
+  const submitJournal = () => {
+    if (!journalDraft.trim()) return;
+    store.addJournal(journalDraft.trim());
+    setJournalDraft('');
+  };
+  const runAnalyze = async (idx) => {
+    setAnalyzingIdx(idx); setAnalyzeErr('');
+    try {
+      const entry = store.data.journal[idx];
+      const result = await analyzeJournal(apiKey, entry.text, store.data.profile);
+      store.setJournalAnalysis(idx, result);
+    } catch (e) {
+      setAnalyzeErr(String(e.message || e));
+    } finally { setAnalyzingIdx(null); }
+  };
   const [msgs, setMsgs] = React.useState([
     { who: 'ai', text: rtl ? 'בוקר יואב. ראיתי שישנת פחות מ-6 שעות. הורדתי את האימון ל-25 דקות ודחפתי את הארוחה הכבדה לצהריים. בסדר?' : 'Morning Yoav. You slept under 6 hrs. I dropped training to 25 min and pushed your heavy meal to midday. OK?' },
     { who: 'me', text: rtl ? 'כן. ואני אחרי יום קשה בעבודה.' : 'Yes. And I had a rough work day.' },
@@ -1647,6 +1794,74 @@ function V2AI({ t, L }) {
             ))}
           </div>
         </V2Card>
+      </div>
+
+      {/* Thoughts journal */}
+      <div style={{ padding: '0 16px 12px' }}>
+        <V2Card pad={14} dark>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <V2Icon name="brain" size={14} color={YLV2_Tokens.amber}/>
+            <span style={{ fontFamily: YLV2_Type.mono, fontSize: 10, color: YLV2_Tokens.amber, letterSpacing: 1.2, textTransform: 'uppercase', fontWeight: 600 }}>
+              {rtl ? 'יומן מחשבות' : 'Thoughts journal'}
+            </span>
+          </div>
+          <textarea value={journalDraft} onChange={e => setJournalDraft(e.target.value)}
+            placeholder={rtl ? 'תרוקן כאן את הראש. אני אנתח ואחזיר לך תובנה.' : "Dump your head here. I'll analyze and reflect back."}
+            rows={4} style={{
+              width: '100%', padding: '12px 14px', borderRadius: 12,
+              background: YLV2_Tokens.ink,
+              border: `1px solid ${YLV2_Tokens.creamHair}`,
+              color: YLV2_Tokens.cream, outline: 'none', resize: 'vertical',
+              fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 13, direction: L.dir,
+            }}/>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, gap: 10 }}>
+            <span style={{ fontFamily: YLV2_Type.mono, fontSize: 10, color: YLV2_Tokens.creamMute }}>
+              {(store.data.journal || []).length} {rtl ? 'רשומות' : 'entries'}
+            </span>
+            <button onClick={submitJournal} disabled={!journalDraft.trim()} style={{
+              padding: '10px 16px', borderRadius: 999, border: 'none',
+              background: YLV2_Tokens.amber, color: YLV2_Tokens.ink, cursor: 'pointer',
+              fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 12, fontWeight: 700,
+              opacity: journalDraft.trim() ? 1 : 0.4,
+            }}>{rtl ? 'שמור' : 'Save'}</button>
+          </div>
+        </V2Card>
+        {analyzeErr && (
+          <div style={{ marginTop: 8, padding: 10, borderRadius: 10, background: 'rgba(229,107,90,0.14)', color: '#F2B9AF', fontSize: 12, fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans }}>
+            {analyzeErr}
+          </div>
+        )}
+        {(store.data.journal || []).slice().reverse().map((entry, revIdx) => {
+          const idx = store.data.journal.length - 1 - revIdx;
+          const isBusy = analyzingIdx === idx;
+          return (
+            <V2Card key={idx} pad={14} dark style={{ marginTop: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
+                <span style={{ fontFamily: YLV2_Type.mono, fontSize: 10, color: YLV2_Tokens.creamMute, letterSpacing: 0.5 }}>
+                  {fmtDateHe(entry.date)} · {fmtTime(entry.date)}
+                </span>
+                <button onClick={() => store.delJournal(idx)} style={{
+                  background: 'transparent', border: 'none', color: YLV2_Tokens.creamMute, cursor: 'pointer',
+                }}><V2Icon name="x" size={12}/></button>
+              </div>
+              <div style={{ fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 13, color: YLV2_Tokens.cream, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+                {entry.text}
+              </div>
+              {entry.analysis ? (
+                <div style={{ marginTop: 10, padding: 12, borderRadius: 10, background: 'rgba(188,255,0,0.07)', border: '1px solid rgba(188,255,0,0.2)', fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 12.5, color: YLV2_Tokens.cream, lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>
+                  {entry.analysis}
+                </div>
+              ) : (
+                <button onClick={() => runAnalyze(idx)} disabled={!apiKey || isBusy} style={{
+                  marginTop: 10, padding: '8px 14px', borderRadius: 999, border: `1px solid ${YLV2_Tokens.amber}`,
+                  background: 'transparent', color: YLV2_Tokens.amber, cursor: 'pointer',
+                  fontFamily: YLV2_Type.mono, fontSize: 11, letterSpacing: 0.5, fontWeight: 600,
+                  opacity: (!apiKey || isBusy) ? 0.5 : 1,
+                }}>{isBusy ? (rtl ? 'מנתח...' : 'Analyzing...') : (apiKey ? (rtl ? 'נתח עם AI' : 'Analyze with AI') : (rtl ? 'דורש מפתח Claude' : 'Claude key required'))}</button>
+              )}
+            </V2Card>
+          );
+        })}
       </div>
 
       <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -1811,6 +2026,185 @@ function SettingsRow({ label, value, danger, onClick }) {
   );
 }
 
+function DislikeEditor({ L, store }) {
+  const rtl = L.dir === 'rtl';
+  const [draft, setDraft] = React.useState('');
+  const commit = () => { const v = draft.trim(); if (!v) return; store.addDislike(v); setDraft(''); };
+  const suggestions = rtl
+    ? ['עגבניות','זיתים','כוסברה','חצילים','פטריות','בננה','חלב','גלוטן','ארטישוק','שום']
+    : ['tomatoes','olives','cilantro','eggplant','mushrooms','banana','dairy','gluten','artichoke','garlic'];
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ display: 'flex', gap: 6 }}>
+        <input value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => e.key === 'Enter' && commit()}
+          placeholder={rtl ? 'לדוגמה: עגבניות' : 'e.g. tomatoes'}
+          style={{ ...inputStyle(rtl), flex: 1 }}/>
+        <button onClick={commit} style={{
+          padding: '0 18px', borderRadius: 14, border: 'none',
+          background: YLV2_Tokens.amber, color: YLV2_Tokens.ink, cursor: 'pointer',
+          fontFamily: YLV2_Type.mono, fontSize: 12, fontWeight: 700,
+        }}>{rtl ? 'הוסף' : 'Add'}</button>
+      </div>
+      {(store.data.dislikes || []).length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {store.data.dislikes.map(d => (
+            <span key={d} onClick={() => store.removeDislike(d)} style={{
+              padding: '6px 12px', borderRadius: 999,
+              background: 'rgba(229,107,90,0.14)', color: '#F2B9AF',
+              border: '1px solid rgba(229,107,90,0.3)',
+              fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 12, fontWeight: 500,
+              cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6,
+            }}>✕ {d}</span>
+          ))}
+        </div>
+      )}
+      <div>
+        <div style={{ fontFamily: YLV2_Type.mono, fontSize: 9.5, color: YLV2_Tokens.creamMute, letterSpacing: 0.5, marginBottom: 6, textTransform: 'uppercase' }}>
+          {rtl ? 'לחץ כדי להוסיף במהירות' : 'Tap to add quickly'}
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {suggestions.filter(s => !(store.data.dislikes || []).includes(s)).map(s => (
+            <button key={s} onClick={() => store.addDislike(s)} style={{
+              padding: '6px 12px', borderRadius: 999,
+              background: 'transparent', color: YLV2_Tokens.creamDim,
+              border: `1px dashed ${YLV2_Tokens.creamHair}`,
+              fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 11.5,
+              cursor: 'pointer',
+            }}>+ {s}</button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ApiKeyEditor({ L, store }) {
+  const rtl = L.dir === 'rtl';
+  const [show, setShow] = React.useState(false);
+  const [draft, setDraft] = React.useState(store.data.apiKey || '');
+  const [status, setStatus] = React.useState('');
+  const hasKey = !!store.data.apiKey;
+
+  const save = () => { store.setApiKey(draft); setStatus(rtl ? 'נשמר' : 'Saved'); setTimeout(() => setStatus(''), 1500); };
+  const test = async () => {
+    setStatus(rtl ? 'בודק...' : 'Testing...');
+    try {
+      const reply = await callClaude({ apiKey: draft || store.data.apiKey, maxTokens: 50, messages: [{ role: 'user', content: rtl ? 'ענה במילה אחת: "עובד".' : 'Reply with one word: "working".' }] });
+      setStatus('✓ ' + (reply || 'OK').slice(0, 40));
+    } catch (e) { setStatus('✕ ' + String(e.message || e).slice(0, 80)); }
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ padding: 12, borderRadius: 12, background: YLV2_Tokens.inkSoft, border: `1px solid ${YLV2_Tokens.creamHair}`, fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 12, color: YLV2_Tokens.creamDim, lineHeight: 1.5 }}>
+        {rtl
+          ? 'המפתח נשמר רק בדפדפן שלך (localStorage). הוא לא עולה לשרת. ניתן לקבל מפתח ב-console.anthropic.com → API Keys. עלות משוערת: פחות מ-$0.003 לתמונה/בקשה עם Haiku.'
+          : 'The key is stored only in your browser (localStorage). Get one at console.anthropic.com → API Keys. Typical cost: < $0.003 per request with Haiku.'}
+      </div>
+      <div style={{ display: 'flex', gap: 6 }}>
+        <input type={show ? 'text' : 'password'} value={draft} onChange={e => setDraft(e.target.value)}
+          placeholder="sk-ant-..." style={{ ...inputStyle(rtl), flex: 1, fontFamily: YLV2_Type.mono, fontSize: 12, direction: 'ltr', textAlign: 'left' }}/>
+        <button onClick={() => setShow(s => !s)} style={{
+          padding: '0 14px', borderRadius: 14, border: `1px solid ${YLV2_Tokens.creamHair}`,
+          background: 'transparent', color: YLV2_Tokens.cream, cursor: 'pointer',
+          fontFamily: YLV2_Type.mono, fontSize: 11,
+        }}>{show ? (rtl ? 'הסתר' : 'Hide') : (rtl ? 'הצג' : 'Show')}</button>
+      </div>
+      <div style={{ display: 'flex', gap: 6 }}>
+        <button onClick={save} style={{
+          flex: 1, padding: '12px', borderRadius: 12, border: 'none',
+          background: YLV2_Tokens.amber, color: YLV2_Tokens.ink, cursor: 'pointer',
+          fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 12, fontWeight: 700,
+        }}>{rtl ? 'שמור' : 'Save'}</button>
+        <button onClick={test} disabled={!(draft || store.data.apiKey)} style={{
+          flex: 1, padding: '12px', borderRadius: 12,
+          background: 'transparent', border: `1px solid ${YLV2_Tokens.creamHair}`,
+          color: YLV2_Tokens.cream, cursor: 'pointer',
+          fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 12, fontWeight: 600,
+          opacity: (draft || store.data.apiKey) ? 1 : 0.4,
+        }}>{rtl ? 'בדוק חיבור' : 'Test connection'}</button>
+      </div>
+      {status && (
+        <div style={{ padding: 10, borderRadius: 10, background: status.startsWith('✕') ? 'rgba(229,107,90,0.14)' : 'rgba(188,255,0,0.1)', color: status.startsWith('✕') ? '#F2B9AF' : YLV2_Tokens.amber, fontFamily: YLV2_Type.mono, fontSize: 11 }}>
+          {status}
+        </div>
+      )}
+      {hasKey && (
+        <button onClick={() => { store.setApiKey(''); setDraft(''); }} style={{
+          padding: '10px', borderRadius: 10, background: 'transparent',
+          border: '1px solid rgba(229,107,90,0.3)', color: YLV2_Tokens.blood, cursor: 'pointer',
+          fontFamily: YLV2_Type.mono, fontSize: 11,
+        }}>{rtl ? 'מחק מפתח' : 'Remove key'}</button>
+      )}
+    </div>
+  );
+}
+
+function GoogleFitConnect({ L, store }) {
+  const rtl = L.dir === 'rtl';
+  const [expanded, setExpanded] = React.useState(false);
+  const connected = !!(store.data.googleFit && store.data.googleFit.accessToken);
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ padding: 14, borderRadius: 12, background: YLV2_Tokens.inkSoft, border: `1px solid ${YLV2_Tokens.creamHair}` }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 13, color: YLV2_Tokens.cream, fontWeight: 500 }}>
+            {connected ? (rtl ? '✓ מחובר' : '✓ Connected') : (rtl ? 'לא מחובר' : 'Not connected')}
+          </span>
+          <button onClick={() => setExpanded(!expanded)} style={{
+            padding: '6px 12px', borderRadius: 999, background: 'transparent',
+            border: `1px solid ${YLV2_Tokens.creamHair}`, color: YLV2_Tokens.creamDim, cursor: 'pointer',
+            fontFamily: YLV2_Type.mono, fontSize: 10,
+          }}>{expanded ? (rtl ? 'סגור' : 'Close') : (rtl ? 'הוראות חיבור' : 'How to connect')}</button>
+        </div>
+        {expanded && (
+          <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${YLV2_Tokens.creamHair}`, fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 12.5, color: YLV2_Tokens.creamDim, lineHeight: 1.6, direction: L.dir }}>
+            <div style={{ fontFamily: YLV2_Type.mono, fontSize: 10, color: YLV2_Tokens.amber, letterSpacing: 1, marginBottom: 8, textTransform: 'uppercase' }}>
+              {rtl ? '4 שלבים · פעם אחת בלבד' : '4 steps · one-time setup'}
+            </div>
+            <ol style={{ paddingInlineStart: 18, margin: 0 }}>
+              <li>{rtl ? 'גש ל-' : 'Go to '}<a href="https://console.cloud.google.com/" target="_blank" rel="noreferrer" style={{ color: YLV2_Tokens.amber }}>console.cloud.google.com</a> {rtl ? 'ופתח פרויקט חדש' : 'and create a new project'}</li>
+              <li>{rtl ? 'APIs & Services → Library → הפעל "Fitness API"' : 'APIs & Services → Library → enable "Fitness API"'}</li>
+              <li>{rtl ? 'Credentials → OAuth client ID (Web) → Authorized origins: ' : 'Credentials → OAuth client ID (Web) → Authorized origins: '}<code style={{ fontFamily: YLV2_Type.mono, color: YLV2_Tokens.amber }}>https://yoav27ron.github.io</code></li>
+              <li>{rtl ? 'תעתיק את ה-Client ID ותשלח לי — אני אחבר לך לסנכרון אמיתי.' : 'Copy the Client ID and send it to me — I\'ll wire the full sync.'}</li>
+            </ol>
+            <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: 'rgba(188,255,0,0.06)', border: '1px solid rgba(188,255,0,0.2)', color: YLV2_Tokens.amber, fontSize: 11.5 }}>
+              {rtl ? 'סנכרון ימשוך: צעדים, אימונים, דופק, ומשקל (אם נמדד במאזניים חכמות).' : 'Sync will pull: steps, workouts, heart rate, and weight (if logged via a smart scale).'}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function GoogleCalConnect({ L, store }) {
+  const rtl = L.dir === 'rtl';
+  const [expanded, setExpanded] = React.useState(false);
+  const connected = !!(store.data.googleCal && store.data.googleCal.accessToken);
+  return (
+    <div style={{ padding: 14, borderRadius: 12, background: YLV2_Tokens.inkSoft, border: `1px solid ${YLV2_Tokens.creamHair}` }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 13, color: YLV2_Tokens.cream, fontWeight: 500 }}>
+          {connected ? (rtl ? '✓ מחובר' : '✓ Connected') : (rtl ? 'לא מחובר' : 'Not connected')}
+        </span>
+        <button onClick={() => setExpanded(!expanded)} style={{
+          padding: '6px 12px', borderRadius: 999, background: 'transparent',
+          border: `1px solid ${YLV2_Tokens.creamHair}`, color: YLV2_Tokens.creamDim, cursor: 'pointer',
+          fontFamily: YLV2_Type.mono, fontSize: 10,
+        }}>{expanded ? (rtl ? 'סגור' : 'Close') : (rtl ? 'הוראות' : 'How')}</button>
+      </div>
+      {expanded && (
+        <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${YLV2_Tokens.creamHair}`, fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 12.5, color: YLV2_Tokens.creamDim, lineHeight: 1.6, direction: L.dir }}>
+          {rtl
+            ? 'אותה עבודה כמו Google Fit, רק עם "Google Calendar API". אחרי שתחבר — המערכת תמשוך את הפגישות של היום כדי להתאים אוכל ורגעי ריסט לפני כל שיחה.'
+            : 'Same setup as Google Fit, but enable "Google Calendar API". Once connected, the system pulls today\'s meetings to tune pre-call food + reset prompts.'}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function V2Settings({ t, L, lang, setLang, mode, setMode, store, close }) {
   const rtl = L.dir === 'rtl';
   const profile = store.data.profile || {};
@@ -1876,6 +2270,26 @@ function V2Settings({ t, L, lang, setLang, mode, setMode, store, close }) {
       </div>
 
       <div style={{ padding: '20px 16px calc(env(safe-area-inset-bottom) + 140px)' }}>
+
+        {/* Dislikes editor */}
+        <SettingsSection label={rtl ? 'מוצרים שאני לא אוכל' : "Foods I don't eat"} icon="x">
+          <DislikeEditor L={L} store={store}/>
+        </SettingsSection>
+
+        {/* Claude API key */}
+        <SettingsSection label={rtl ? 'חיבור ל-AI · Claude' : 'AI · Claude'} icon="brain">
+          <ApiKeyEditor L={L} store={store}/>
+        </SettingsSection>
+
+        {/* Google Fit — stub */}
+        <SettingsSection label={rtl ? 'סנכרון עם Google Fit' : 'Google Fit sync'} icon="bolt">
+          <GoogleFitConnect L={L} store={store}/>
+        </SettingsSection>
+
+        {/* Google Calendar — stub */}
+        <SettingsSection label={rtl ? 'סנכרון עם Google Calendar' : 'Google Calendar sync'} icon="clock">
+          <GoogleCalConnect L={L} store={store}/>
+        </SettingsSection>
 
         <SettingsSection label={rtl ? 'שפה' : 'Language'} icon="globe">
           <div style={{ display: 'flex', gap: 8 }}>
@@ -1960,6 +2374,134 @@ function V2Settings({ t, L, lang, setLang, mode, setMode, store, close }) {
       </div>
     </div>
   );
+}
+
+/* ──────────────────────────────────────────────────────────────
+   Static catalogs — recipes + workout videos
+   ────────────────────────────────────────────────────────────── */
+const RECIPES = [
+  // name in HE/EN, ingredients in HE (normalized), kcal per serving, protein, minutes, yt query
+  { id: 'shakshuka',    he: 'שקשוקה חלבונית',        en: 'High-protein shakshuka',   ingredients: ['עגבניות','ביצים','פלפל','בצל','שום','שמן זית'], subs: { 'עגבניות': 'רוטב פלפל אדום' }, kcal: 420, protein: 28, minutes: 15, ytq: 'שקשוקה חלבונית' },
+  { id: 'chicken_salad',he: 'חזה עוף על סלט גדול',   en: 'Chicken on big salad',      ingredients: ['חזה עוף','סלט','מלפפון','עגבניות','לימון','שמן זית'], subs: { 'עגבניות': 'פלפל' }, kcal: 480, protein: 42, minutes: 20, ytq: 'חזה עוף בגריל עם סלט' },
+  { id: 'hummus_egg',   he: 'חומוס + ביצה + סלט',    en: 'Hummus + egg + salad',      ingredients: ['חומוס','ביצים','סלט','לימון','שמן זית','פיתה'], subs: { 'פיתה': 'פרוסת שיפון' }, kcal: 540, protein: 26, minutes: 8, ytq: 'חומוס ביתי' },
+  { id: 'tuna_rye',     he: 'טונה על לחם שיפון',      en: 'Tuna on rye',              ingredients: ['טונה','לחם שיפון','מלפפון','חרדל'], subs: {}, kcal: 380, protein: 32, minutes: 5, ytq: 'סלט טונה בריא' },
+  { id: 'greek_yogurt', he: 'יוגורט יווני + שקדים',   en: 'Greek yogurt + almonds',   ingredients: ['יוגורט יווני','שקדים','דבש'], subs: { 'דבש': 'סילאן' }, kcal: 320, protein: 24, minutes: 2, ytq: 'יוגורט יווני חלבוני' },
+  { id: 'baked_schnitzel', he: 'שניצל אפוי + אורז וירק', en: 'Baked schnitzel + rice', ingredients: ['חזה עוף','פירורי לחם','אורז','ברוקולי','שמן זית'], subs: { 'אורז': 'קינואה' }, kcal: 620, protein: 45, minutes: 30, ytq: 'שניצל אפוי בתנור' },
+  { id: 'shawarma_salad', he: 'שווארמה בסלט גדול',   en: 'Shawarma on salad',         ingredients: ['חזה עוף','בצל','פלפל','סלט','טחינה'], subs: {}, kcal: 580, protein: 40, minutes: 25, ytq: 'שווארמה ביתית בריאה' },
+  { id: 'salmon_veg',   he: 'סלמון + ירקות בתנור',    en: 'Salmon + roasted veg',     ingredients: ['סלמון','ברוקולי','גזר','שמן זית','לימון'], subs: {}, kcal: 520, protein: 38, minutes: 25, ytq: 'סלמון בתנור' },
+  { id: 'omelet',       he: 'חביתה 3 ביצים + גבינה',  en: '3-egg cheese omelet',      ingredients: ['ביצים','גבינה','בצל','פלפל'], subs: { 'גבינה': 'גבינת קוטג׳' }, kcal: 380, protein: 28, minutes: 7, ytq: 'חביתה חלבונית' },
+  { id: 'lentil_soup',  he: 'מרק עדשים',              en: 'Lentil soup',              ingredients: ['עדשים','בצל','גזר','סלרי','כמון'], subs: {}, kcal: 340, protein: 20, minutes: 40, ytq: 'מרק עדשים ביתי' },
+  { id: 'cottage_toast',he: 'טוסט קוטג׳ ועגבנייה',   en: 'Cottage toast',            ingredients: ['לחם שיפון','קוטג׳','עגבניות','אורגנו'], subs: { 'עגבניות': 'מלפפון' }, kcal: 300, protein: 22, minutes: 5, ytq: 'טוסט קוטג׳' },
+  { id: 'stir_fry',     he: 'מוקפץ עוף + ירקות',     en: 'Chicken stir-fry',          ingredients: ['חזה עוף','פלפל','בצל','גזר','סויה','שום'], subs: { 'סויה': 'טמרי' }, kcal: 460, protein: 38, minutes: 15, ytq: 'מוקפץ עוף בריא' },
+  { id: 'oats_bowl',    he: 'שיבולת שועל + יוגורט',  en: 'Oats + yogurt bowl',       ingredients: ['שיבולת שועל','יוגורט','פירות יער','אגוזים'], subs: {}, kcal: 380, protein: 22, minutes: 5, ytq: 'ארוחת בוקר שיבולת שועל' },
+  { id: 'beef_bowl',    he: 'בקר טחון + אורז',        en: 'Ground beef bowl',          ingredients: ['בקר טחון','אורז','בצל','שום','פטרוזיליה'], subs: { 'אורז': 'כרוב' }, kcal: 560, protein: 42, minutes: 20, ytq: 'קערת בקר ואורז' },
+  { id: 'tuna_avocado', he: 'טונה + אבוקדו',          en: 'Tuna + avocado',           ingredients: ['טונה','אבוקדו','לימון','בצל','מלפפון'], subs: {}, kcal: 420, protein: 34, minutes: 5, ytq: 'סלט טונה אבוקדו' },
+];
+
+const WORKOUT_VIDEOS = {
+  walk:     { ytq: 'מה הדרך הנכונה ללכת מהר',        title_he: 'הליכה מהירה נכונה',          title_en: 'Brisk walking form' },
+  run:      { ytq: 'ריצה למתחילים טכניקה נכונה',     title_he: 'ריצה — טכניקה למתחילים',     title_en: 'Running form for beginners' },
+  strength: { ytq: 'אימון כוח בבית 30 דקות',          title_he: 'אימון כוח 30 דק׳ בבית',       title_en: '30-min home strength' },
+  hiit:     { ytq: 'HIIT 20 minute workout no equipment', title_he: 'HIIT 20 דק׳ בלי ציוד',   title_en: '20-min HIIT no equipment' },
+  mobility: { ytq: 'ניידות בוקר 10 דקות',             title_he: 'ניידות 10 דק׳',                title_en: '10-min mobility' },
+  boxing:   { ytq: 'אימון אגרוף למתחילים בבית',      title_he: 'אגרוף למתחילים',               title_en: 'Shadow boxing basics' },
+  swim:     { ytq: 'סגנון חזה טכניקה',                title_he: 'שחיה — טכניקת חזה',           title_en: 'Breaststroke technique' },
+  other:    { ytq: 'אימון 20 דקות בית',               title_he: 'אימון 20 דק׳ בבית',            title_en: '20-min home workout' },
+};
+
+function ytSearchUrl(q) { return `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`; }
+function ytWatchSearchUrl(q) { return `https://m.youtube.com/results?search_query=${encodeURIComponent(q)}`; }
+
+// Recipe filtering: exclude recipes containing any ingredient the user dislikes.
+// If a dislike has a substitution defined, include the recipe but mark it.
+function filterRecipes(recipes, dislikes) {
+  const dis = new Set((dislikes || []).map(s => s.toLowerCase().trim()).filter(Boolean));
+  return recipes.map(r => {
+    const hits = r.ingredients.filter(ing => dis.has(ing.toLowerCase().trim()));
+    if (hits.length === 0) return { ...r, ok: true, swaps: [] };
+    const swappable = hits.filter(h => r.subs && r.subs[h]);
+    if (swappable.length === hits.length) return { ...r, ok: true, swaps: swappable.map(h => ({ from: h, to: r.subs[h] })) };
+    return { ...r, ok: false, blocked: hits };
+  }).filter(r => r.ok);
+}
+
+/* ──────────────────────────────────────────────────────────────
+   Claude API (client-side) — user supplies their own key
+   ────────────────────────────────────────────────────────────── */
+async function callClaude({ apiKey, messages, model = 'claude-haiku-4-5-20251001', maxTokens = 800 }) {
+  if (!apiKey) throw new Error('NO_API_KEY');
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({ model, max_tokens: maxTokens, messages }),
+  });
+  if (!res.ok) {
+    const t = await res.text();
+    throw new Error(`Claude ${res.status}: ${t.slice(0, 200)}`);
+  }
+  const j = await res.json();
+  return j.content && j.content[0] && j.content[0].text || '';
+}
+
+async function fileToBase64(file) {
+  const buf = await file.arrayBuffer();
+  const bytes = new Uint8Array(buf);
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
+}
+
+async function analyzeMealPhoto(apiKey, file) {
+  const b64 = await fileToBase64(file);
+  const mediaType = file.type && file.type.startsWith('image/') ? file.type : 'image/jpeg';
+  const prompt = 'זהה מה זה ותן ערכים תזונתיים משוערים. החזר רק JSON בפורמט: {"name":"שם קצר בעברית","kcal":מספר,"protein":מספר,"slot":"breakfast|lunch|dinner|snack","notes":"הערה קצרה"} — בלי טקסט נוסף, בלי ```.';
+  const raw = await callClaude({
+    apiKey, maxTokens: 400,
+    messages: [{
+      role: 'user',
+      content: [
+        { type: 'image', source: { type: 'base64', media_type: mediaType, data: b64 } },
+        { type: 'text', text: prompt },
+      ],
+    }],
+  });
+  return JSON.parse(raw.replace(/^```(?:json)?|```$/g, '').trim());
+}
+
+async function analyzeProductPhoto(apiKey, file, { dislikes = [], targetWeight } = {}) {
+  const b64 = await fileToBase64(file);
+  const mediaType = file.type && file.type.startsWith('image/') ? file.type : 'image/jpeg';
+  const ctx = `רשימת מוצרים שאני לא אוכל: ${dislikes.join(', ') || 'אין'}. יעד: ${targetWeight ? targetWeight + ' ק״ג' : 'ירידה במשקל בריאה'}.`;
+  const prompt = `אני מראה לך תמונה של מוצר מזון (אריזה/תווית). תחזיר רק JSON: {"name":"שם המוצר","kcal_per_100g":מספר,"protein_per_100g":מספר,"recommended":true/false,"why":"הסבר קצר בעברית","better_alternative":"אם לא מומלץ — הצעה קצרה"}. ${ctx}`;
+  const raw = await callClaude({
+    apiKey, maxTokens: 500,
+    messages: [{
+      role: 'user',
+      content: [
+        { type: 'image', source: { type: 'base64', media_type: mediaType, data: b64 } },
+        { type: 'text', text: prompt },
+      ],
+    }],
+  });
+  return JSON.parse(raw.replace(/^```(?:json)?|```$/g, '').trim());
+}
+
+async function analyzeJournal(apiKey, text, profile) {
+  const name = (profile && profile.name) || 'יואב';
+  const prompt = `${name} כתב את המחשבות הבאות. תן לו תגובה קצרה, ישירה, בעברית, בלי נדושות, במבנה הזה בדיוק:
+
+**מה אתה מרגיש באמת:** [משפט אחד]
+**דפוס שאני רואה:** [משפט אחד]
+**צעד אחד קטן עכשיו:** [פעולה אחת ספציפית שאפשר לעשות ב-5 דקות]
+
+המחשבות של ${name}:
+"""${text}"""`;
+  return callClaude({ apiKey, maxTokens: 500, messages: [{ role: 'user', content: prompt }] });
 }
 
 /* ──────────────────────────────────────────────────────────────
@@ -2243,6 +2785,123 @@ function WorkoutSheet({ L, onClose }) {
   );
 }
 
+function PhotoMealSheet({ L, onClose }) {
+  const rtl = L.dir === 'rtl';
+  const store = useStore();
+  const [busy, setBusy] = React.useState(false);
+  const [err, setErr] = React.useState('');
+  const [preview, setPreview] = React.useState(null);
+  const [parsed, setParsed] = React.useState(null);
+  const fileRef = React.useRef(null);
+  const apiKey = store.data.apiKey;
+
+  const pickFile = (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    setPreview(URL.createObjectURL(f));
+    setParsed(null); setErr(''); setBusy(true);
+    analyzeMealPhoto(apiKey, f)
+      .then(r => { setParsed(r); setBusy(false); })
+      .catch(e => { setErr(String(e.message || e)); setBusy(false); });
+  };
+
+  const save = () => {
+    if (!parsed) return;
+    store.addMeal({ name: parsed.name || 'Meal', kcal: +parsed.kcal || 0, protein: +parsed.protein || 0, slot: parsed.slot || 'lunch' });
+    onClose();
+  };
+
+  return (
+    <Sheet L={L} title={rtl ? 'צילום ארוחה' : 'Photo meal'} onClose={onClose}>
+      {!apiKey && (
+        <div style={{ padding: 14, borderRadius: 12, background: 'rgba(229,107,90,0.12)', border: '1px solid rgba(229,107,90,0.3)', marginBottom: 12, color: '#F2B9AF', fontSize: 13, lineHeight: 1.5 }}>
+          {rtl ? 'צריך להזין מפתח Claude API בהגדרות כדי להפעיל ניתוח תמונה.' : 'Set your Claude API key in Settings to enable photo analysis.'}
+        </div>
+      )}
+      <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={pickFile} style={{ display: 'none' }}/>
+      <button onClick={() => apiKey && fileRef.current && fileRef.current.click()} disabled={!apiKey || busy} style={{
+        ...primaryBtn(rtl), width: '100%', opacity: (!apiKey || busy) ? 0.5 : 1,
+      }}>
+        {busy ? (rtl ? 'מנתח...' : 'Analyzing...') : (preview ? (rtl ? 'החלף תמונה' : 'Change photo') : (rtl ? 'פתח מצלמה / גלריה' : 'Open camera / gallery'))}
+      </button>
+      {preview && (
+        <div style={{ marginTop: 12 }}>
+          <img src={preview} alt="" style={{ width: '100%', borderRadius: 14, border: `1px solid ${YLV2_Tokens.creamHair}` }}/>
+        </div>
+      )}
+      {err && <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: 'rgba(229,107,90,0.14)', color: '#F2B9AF', fontSize: 12 }}>{err}</div>}
+      {parsed && (
+        <div style={{ marginTop: 12, padding: 14, borderRadius: 14, background: YLV2_Tokens.inkSoft, border: `1px solid ${YLV2_Tokens.creamHair}` }}>
+          <div style={{ fontFamily: rtl ? YLV2_Type.heb : YLV2_Type.serif, fontSize: 18, color: YLV2_Tokens.cream }}>{parsed.name}</div>
+          <div style={{ fontFamily: YLV2_Type.mono, fontSize: 11, color: YLV2_Tokens.creamMute, marginTop: 4 }}>{parsed.kcal} kcal · {parsed.protein}g P · {parsed.slot}</div>
+          {parsed.notes && <div style={{ fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 12, color: YLV2_Tokens.creamDim, marginTop: 6 }}>{parsed.notes}</div>}
+          <button onClick={save} style={{ ...primaryBtn(rtl), width: '100%', marginTop: 12 }}>{rtl ? 'שמור כארוחה' : 'Save as meal'}</button>
+        </div>
+      )}
+    </Sheet>
+  );
+}
+
+function ProductScanSheet({ L, onClose }) {
+  const rtl = L.dir === 'rtl';
+  const store = useStore();
+  const [busy, setBusy] = React.useState(false);
+  const [err, setErr] = React.useState('');
+  const [preview, setPreview] = React.useState(null);
+  const [parsed, setParsed] = React.useState(null);
+  const fileRef = React.useRef(null);
+  const apiKey = store.data.apiKey;
+  const dislikes = store.data.dislikes || [];
+  const targetWeight = store.data.profile && store.data.profile.targetWeight;
+
+  const pickFile = (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    setPreview(URL.createObjectURL(f));
+    setParsed(null); setErr(''); setBusy(true);
+    analyzeProductPhoto(apiKey, f, { dislikes, targetWeight })
+      .then(r => { setParsed(r); setBusy(false); })
+      .catch(e => { setErr(String(e.message || e)); setBusy(false); });
+  };
+
+  return (
+    <Sheet L={L} title={rtl ? 'סריקת מוצר' : 'Product scan'} onClose={onClose}>
+      {!apiKey && (
+        <div style={{ padding: 14, borderRadius: 12, background: 'rgba(229,107,90,0.12)', border: '1px solid rgba(229,107,90,0.3)', marginBottom: 12, color: '#F2B9AF', fontSize: 13, lineHeight: 1.5 }}>
+          {rtl ? 'צריך להזין מפתח Claude API בהגדרות.' : 'Set your Claude API key in Settings first.'}
+        </div>
+      )}
+      <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={pickFile} style={{ display: 'none' }}/>
+      <button onClick={() => apiKey && fileRef.current && fileRef.current.click()} disabled={!apiKey || busy} style={{
+        ...primaryBtn(rtl), width: '100%', opacity: (!apiKey || busy) ? 0.5 : 1,
+      }}>
+        {busy ? (rtl ? 'מנתח...' : 'Analyzing...') : (rtl ? 'צלם אריזה / תווית' : 'Scan package / label')}
+      </button>
+      {preview && <img src={preview} alt="" style={{ width: '100%', borderRadius: 14, marginTop: 12, border: `1px solid ${YLV2_Tokens.creamHair}` }}/>}
+      {err && <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: 'rgba(229,107,90,0.14)', color: '#F2B9AF', fontSize: 12 }}>{err}</div>}
+      {parsed && (
+        <div style={{ marginTop: 12, padding: 14, borderRadius: 14, background: parsed.recommended ? 'rgba(188,255,0,0.08)' : 'rgba(229,107,90,0.08)', border: `1px solid ${parsed.recommended ? 'rgba(188,255,0,0.28)' : 'rgba(229,107,90,0.28)'}` }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+            <div style={{ fontFamily: rtl ? YLV2_Type.heb : YLV2_Type.serif, fontSize: 18, color: YLV2_Tokens.cream }}>{parsed.name}</div>
+            <div style={{ fontFamily: YLV2_Type.mono, fontSize: 10, fontWeight: 700, color: parsed.recommended ? YLV2_Tokens.amber : YLV2_Tokens.blood, letterSpacing: 1, textTransform: 'uppercase' }}>
+              {parsed.recommended ? (rtl ? 'מתאים' : 'OK') : (rtl ? 'לא מתאים' : 'Skip')}
+            </div>
+          </div>
+          <div style={{ fontFamily: YLV2_Type.mono, fontSize: 11, color: YLV2_Tokens.creamMute, marginTop: 6 }}>
+            {parsed.kcal_per_100g} kcal / 100g · {parsed.protein_per_100g}g P / 100g
+          </div>
+          <div style={{ fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 13, color: YLV2_Tokens.cream, marginTop: 8, lineHeight: 1.4 }}>{parsed.why}</div>
+          {parsed.better_alternative && !parsed.recommended && (
+            <div style={{ marginTop: 8, padding: 10, borderRadius: 10, background: 'rgba(188,255,0,0.08)', border: '1px solid rgba(188,255,0,0.2)', fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 12, color: YLV2_Tokens.amber }}>
+              {rtl ? 'במקום זה: ' : 'Instead: '}{parsed.better_alternative}
+            </div>
+          )}
+        </div>
+      )}
+    </Sheet>
+  );
+}
+
 /* ──────────────────────────────────────────────────────────────
    App shell — wires screens + overlays + language
    ────────────────────────────────────────────────────────────── */
@@ -2279,6 +2938,8 @@ function AppInner() {
     openWeight:  () => setOverlay('weight'),
     openMeal:    () => setOverlay('meal'),
     openWorkout: () => setOverlay('workout'),
+    openPhotoMeal:  () => setOverlay('photoMeal'),
+    openProductScan: () => setOverlay('productScan'),
   };
 
   const screen = (() => {
@@ -2340,9 +3001,11 @@ function AppInner() {
       {overlay === 'notifs'   && <V2Notifications t={t} L={L} close={() => setOverlay(null)}/>}
       {overlay === 'modes'    && <V2ModePicker t={t} L={L} active={mode} setActive={setMode} onClose={() => setOverlay(null)}/>}
       {overlay === 'settings' && <V2Settings t={t} L={L} lang={lang} setLang={setLang} mode={mode} setMode={setMode} store={store} close={() => setOverlay(null)}/>}
-      {overlay === 'weight'   && <WeightSheet L={L} onClose={() => setOverlay(null)}/>}
-      {overlay === 'meal'     && <MealSheet L={L} onClose={() => setOverlay(null)}/>}
-      {overlay === 'workout'  && <WorkoutSheet L={L} onClose={() => setOverlay(null)}/>}
+      {overlay === 'weight'     && <WeightSheet L={L} onClose={() => setOverlay(null)}/>}
+      {overlay === 'meal'       && <MealSheet L={L} onClose={() => setOverlay(null)}/>}
+      {overlay === 'workout'    && <WorkoutSheet L={L} onClose={() => setOverlay(null)}/>}
+      {overlay === 'photoMeal'  && <PhotoMealSheet L={L} onClose={() => setOverlay(null)}/>}
+      {overlay === 'productScan'&& <ProductScanSheet L={L} onClose={() => setOverlay(null)}/>}
     </div>
   );
 }
