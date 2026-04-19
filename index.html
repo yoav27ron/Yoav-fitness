@@ -2687,7 +2687,7 @@ function secondaryBtn(rtl) {
   };
 }
 
-function Sheet({ L, title, onClose, children }) {
+function Sheet({ L, title, onClose, children, footer }) {
   const rtl = L.dir === 'rtl';
   return (
     <div onClick={onClose} style={{
@@ -2700,20 +2700,34 @@ function Sheet({ L, title, onClose, children }) {
         borderTopLeftRadius: 24, borderTopRightRadius: 24,
         border: `1px solid ${YLV2_Tokens.creamHair}`,
         width: '100%', maxWidth: 480,
-        padding: '18px 22px calc(env(safe-area-inset-bottom) + 22px)',
+        maxHeight: '92dvh',
+        display: 'flex', flexDirection: 'column',
         direction: L.dir,
         boxShadow: '0 -20px 60px rgba(0,0,0,0.5)',
       }}>
-        <div style={{ width: 40, height: 4, borderRadius: 2, background: YLV2_Tokens.creamHair, margin: '0 auto 14px' }}/>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-          <span style={{ fontFamily: rtl ? YLV2_Type.heb : YLV2_Type.serif, fontSize: 22, color: YLV2_Tokens.cream, letterSpacing: -0.3 }}>{title}</span>
-          <button onClick={onClose} style={{
-            width: 34, height: 34, borderRadius: 17, border: `1px solid ${YLV2_Tokens.creamHair}`,
-            background: 'transparent', color: YLV2_Tokens.cream, cursor: 'pointer',
-            display: 'grid', placeItems: 'center',
-          }}><V2Icon name="x" size={14}/></button>
+        {/* Header — stays pinned at the top */}
+        <div style={{ padding: '14px 22px 10px', flexShrink: 0 }}>
+          <div style={{ width: 40, height: 4, borderRadius: 2, background: YLV2_Tokens.creamHair, margin: '0 auto 12px' }}/>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontFamily: rtl ? YLV2_Type.heb : YLV2_Type.serif, fontSize: 22, color: YLV2_Tokens.cream, letterSpacing: -0.3 }}>{title}</span>
+            <button onClick={onClose} style={{
+              width: 34, height: 34, borderRadius: 17, border: `1px solid ${YLV2_Tokens.creamHair}`,
+              background: 'transparent', color: YLV2_Tokens.cream, cursor: 'pointer',
+              display: 'grid', placeItems: 'center', flexShrink: 0,
+            }}><V2Icon name="x" size={14}/></button>
+          </div>
         </div>
-        {children}
+        {/* Scrollable body */}
+        <div style={{ padding: '4px 22px 16px', overflowY: 'auto', flex: 1, WebkitOverflowScrolling: 'touch' }}>
+          {children}
+        </div>
+        {/* Optional sticky footer (e.g. a prominent Save button) */}
+        {footer && (
+          <div style={{ padding: '10px 22px calc(env(safe-area-inset-bottom) + 14px)', borderTop: `1px solid ${YLV2_Tokens.creamHair}`, background: YLV2_Tokens.inkElev, flexShrink: 0 }}>
+            {footer}
+          </div>
+        )}
+        {!footer && <div style={{ height: 'calc(env(safe-area-inset-bottom) + 14px)', flexShrink: 0 }}/>}
       </div>
     </div>
   );
@@ -2853,8 +2867,14 @@ function PhotoMealSheet({ L, onClose }) {
     onClose();
   };
 
+  const footer = parsed ? (
+    <button onClick={save} style={{ ...primaryBtn(rtl), width: '100%' }}>
+      {rtl ? `שמור כארוחה · ${parsed.kcal} kcal` : `Save as meal · ${parsed.kcal} kcal`}
+    </button>
+  ) : null;
+
   return (
-    <Sheet L={L} title={rtl ? 'צילום ארוחה' : 'Photo meal'} onClose={onClose}>
+    <Sheet L={L} title={rtl ? 'צילום ארוחה' : 'Photo meal'} onClose={onClose} footer={footer}>
       {!apiKey && (
         <div style={{ padding: 14, borderRadius: 12, background: 'rgba(229,107,90,0.12)', border: '1px solid rgba(229,107,90,0.3)', marginBottom: 12, color: '#F2B9AF', fontSize: 13, lineHeight: 1.5 }}>
           {rtl ? 'צריך להזין מפתח Claude API בהגדרות כדי להפעיל ניתוח תמונה.' : 'Set your Claude API key in Settings to enable photo analysis.'}
@@ -2867,17 +2887,16 @@ function PhotoMealSheet({ L, onClose }) {
         {busy ? (rtl ? 'מנתח...' : 'Analyzing...') : (preview ? (rtl ? 'החלף תמונה' : 'Change photo') : (rtl ? 'פתח מצלמה / גלריה' : 'Open camera / gallery'))}
       </button>
       {preview && (
-        <div style={{ marginTop: 12 }}>
-          <img src={preview} alt="" style={{ width: '100%', borderRadius: 14, border: `1px solid ${YLV2_Tokens.creamHair}` }}/>
+        <div style={{ marginTop: 12, maxHeight: 180, overflow: 'hidden', borderRadius: 14, border: `1px solid ${YLV2_Tokens.creamHair}` }}>
+          <img src={preview} alt="" style={{ width: '100%', height: 180, objectFit: 'cover', display: 'block' }}/>
         </div>
       )}
-      {err && <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: 'rgba(229,107,90,0.14)', color: '#F2B9AF', fontSize: 12 }}>{err}</div>}
+      {err && <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: 'rgba(229,107,90,0.14)', color: '#F2B9AF', fontSize: 12, lineHeight: 1.4 }}>{err}</div>}
       {parsed && (
         <div style={{ marginTop: 12, padding: 14, borderRadius: 14, background: YLV2_Tokens.inkSoft, border: `1px solid ${YLV2_Tokens.creamHair}` }}>
-          <div style={{ fontFamily: rtl ? YLV2_Type.heb : YLV2_Type.serif, fontSize: 18, color: YLV2_Tokens.cream }}>{parsed.name}</div>
+          <div style={{ fontFamily: rtl ? YLV2_Type.heb : YLV2_Type.serif, fontSize: 18, color: YLV2_Tokens.cream, lineHeight: 1.25 }}>{parsed.name}</div>
           <div style={{ fontFamily: YLV2_Type.mono, fontSize: 11, color: YLV2_Tokens.creamMute, marginTop: 4 }}>{parsed.kcal} kcal · {parsed.protein}g P · {parsed.slot}</div>
-          {parsed.notes && <div style={{ fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 12, color: YLV2_Tokens.creamDim, marginTop: 6 }}>{parsed.notes}</div>}
-          <button onClick={save} style={{ ...primaryBtn(rtl), width: '100%', marginTop: 12 }}>{rtl ? 'שמור כארוחה' : 'Save as meal'}</button>
+          {parsed.notes && <div style={{ fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 12.5, color: YLV2_Tokens.creamDim, marginTop: 8, lineHeight: 1.5 }}>{parsed.notes}</div>}
         </div>
       )}
     </Sheet>
@@ -2919,8 +2938,12 @@ function ProductScanSheet({ L, onClose }) {
       }}>
         {busy ? (rtl ? 'מנתח...' : 'Analyzing...') : (rtl ? 'צלם אריזה / תווית' : 'Scan package / label')}
       </button>
-      {preview && <img src={preview} alt="" style={{ width: '100%', borderRadius: 14, marginTop: 12, border: `1px solid ${YLV2_Tokens.creamHair}` }}/>}
-      {err && <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: 'rgba(229,107,90,0.14)', color: '#F2B9AF', fontSize: 12 }}>{err}</div>}
+      {preview && (
+        <div style={{ marginTop: 12, maxHeight: 180, overflow: 'hidden', borderRadius: 14, border: `1px solid ${YLV2_Tokens.creamHair}` }}>
+          <img src={preview} alt="" style={{ width: '100%', height: 180, objectFit: 'cover', display: 'block' }}/>
+        </div>
+      )}
+      {err && <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: 'rgba(229,107,90,0.14)', color: '#F2B9AF', fontSize: 12, lineHeight: 1.4 }}>{err}</div>}
       {parsed && (
         <div style={{ marginTop: 12, padding: 14, borderRadius: 14, background: parsed.recommended ? 'rgba(188,255,0,0.08)' : 'rgba(229,107,90,0.08)', border: `1px solid ${parsed.recommended ? 'rgba(188,255,0,0.28)' : 'rgba(229,107,90,0.28)'}` }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
