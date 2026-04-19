@@ -8,44 +8,36 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..800;1,9..144,300..800&family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&family=Frank+Ruhl+Libre:wght@400;500;700&family=Heebo:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 <style>
-  html, body { margin: 0; padding: 0; background: #061414; font-family: 'Heebo','Geist',-apple-system,system-ui,sans-serif; -webkit-font-smoothing: antialiased; color: #E9EBE6; min-height: 100vh; }
+  html, body {
+    margin: 0; padding: 0;
+    background: #061414;
+    color: #E9EBE6;
+    font-family: 'Heebo','Geist',-apple-system,system-ui,sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior: none;
+  }
+  html { height: 100%; }
+  body { min-height: 100vh; min-height: 100dvh; }
+  #root { min-height: 100vh; min-height: 100dvh; }
   *, *::before, *::after { box-sizing: border-box; }
   button { font-family: inherit; }
   em { font-style: italic; }
   ::-webkit-scrollbar { width: 0; height: 0; }
 
-  .stage {
-    min-height: 100vh;
-    display: flex; align-items: center; justify-content: center;
-    padding: 24px 16px;
-    background:
-      radial-gradient(1200px 600px at 50% -10%, rgba(188,255,0,0.08), transparent 60%),
-      radial-gradient(800px 600px at 100% 100%, rgba(188,255,0,0.04), transparent 70%),
-      #061414;
-  }
-  .phone-wrap { transform-origin: center center; }
-  .toolbar {
-    position: fixed; top: 14px; left: 14px; right: 14px;
-    display: flex; justify-content: space-between; align-items: center;
-    font-family: 'Geist Mono', monospace; color: rgba(233,235,230,0.55);
-    font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
-    z-index: 100; pointer-events: none;
-  }
-  .toolbar > * { pointer-events: auto; }
-  .toolbar button {
-    padding: 8px 14px; border-radius: 999px;
-    border: 1px solid rgba(233,235,230,0.14);
-    background: rgba(17,38,38,0.7); color: #E9EBE6;
-    backdrop-filter: blur(10px);
-    font-family: 'Geist Mono', monospace; font-size: 10px; letter-spacing: 1.5px;
-    cursor: pointer; text-transform: uppercase;
-  }
-  .toolbar button:hover { background: #112626; }
-  .toolbar button.primary { background: #BCFF00; color: #061414; border-color: #BCFF00; font-weight: 700; }
-
-  @media (max-width: 520px) {
-    .stage { padding: 0; }
-    .phone-wrap { transform: none !important; }
+  /* Desktop: center the app with a max width to avoid ultra-wide stretched content */
+  @media (min-width: 900px) {
+    body {
+      background:
+        radial-gradient(1200px 600px at 50% -10%, rgba(188,255,0,0.05), transparent 60%),
+        #061414;
+    }
+    #root {
+      max-width: 480px;
+      margin: 0 auto;
+      min-height: 100dvh;
+      box-shadow: 0 0 0 1px rgba(233,235,230,0.08), 0 30px 80px rgba(0,0,0,0.5);
+      overflow: hidden;
+    }
   }
 </style>
 
@@ -68,16 +60,7 @@
 </head>
 <body>
 
-<div class="toolbar">
-  <div id="brand">YOAV · LIFE · V2 · PERSONAL OS</div>
-  <div id="controls"></div>
-</div>
-
-<div class="stage">
-  <div class="phone-wrap" id="phone-wrap">
-    <div id="root"></div>
-  </div>
-</div>
+<div id="root"></div>
 
 <script type="text/babel" data-presets="react">
 /* ──────────────────────────────────────────────────────────────
@@ -395,6 +378,9 @@ function V2Icon({ name, size = 20, color = 'currentColor' }) {
     eye:    <><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z" {...p}/><circle cx="12" cy="12" r="3" {...p}/></>,
     handUp: <><path d="M6 10V6a2 2 0 014 0v4M10 10V5a2 2 0 014 0v5M14 10V7a2 2 0 014 0v6c0 4-3 8-7 8s-7-3-7-7v-3a2 2 0 014 0" {...p}/></>,
     bell:   <><path d="M6 8a6 6 0 1112 0c0 7 3 9 3 9H3s3-2 3-9zM10 21a2 2 0 004 0" {...p}/></>,
+    cog:    <><circle cx="12" cy="12" r="3" {...p}/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1" {...p}/></>,
+    user:   <><circle cx="12" cy="8" r="4" {...p}/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8" {...p}/></>,
+    globe:  <><circle cx="12" cy="12" r="9" {...p}/><path d="M3 12h18M12 3a15 15 0 010 18M12 3a15 15 0 000 18" {...p}/></>,
   };
   return <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden="true">{paths[name] || null}</svg>;
 }
@@ -483,7 +469,7 @@ function V2Today({ t, L, go, state, setState, openSOS, openNotifs, openMode, mod
 
   return (
     <div style={{ padding: '0 0 150px', direction: L.dir, color: YLV2_Tokens.cream }}>
-      <div style={{ padding: '56px 22px 6px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      <div style={{ padding: 'calc(env(safe-area-inset-top) + 64px) 22px 6px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <div style={{ fontFamily: YLV2_Type.mono, fontSize: 10.5, color: YLV2_Tokens.creamMute, letterSpacing: 1.5, textTransform: 'uppercase' }}>{t.dayCount}</div>
           <div style={{ fontFamily: rtl ? YLV2_Type.heb : YLV2_Type.serif, fontSize: 34, color: YLV2_Tokens.cream, lineHeight: 1.05, letterSpacing: -0.5, marginTop: 8 }}>
@@ -668,7 +654,7 @@ function V2CheckIn({ t, L, onDone, rtl }) {
   );
 
   return (
-    <div style={{ padding: '60px 22px 40px', direction: L.dir }}>
+    <div style={{ padding: 'calc(env(safe-area-inset-top) + 64px) 22px calc(env(safe-area-inset-bottom) + 40px)', direction: L.dir }}>
       <div style={{ fontFamily: YLV2_Type.mono, fontSize: 10.5, color: YLV2_Tokens.amber, letterSpacing: 1.5, textTransform: 'uppercase' }}>
         {t.checkIn}
       </div>
@@ -734,9 +720,10 @@ function V2SOS({ t, L, close }) {
 
     return (
       <div style={{
-        position: 'absolute', inset: 0, background: YLV2_Tokens.blood,
-        color: YLV2_Tokens.cream, padding: '56px 22px 40px',
+        position: 'fixed', inset: 0, background: YLV2_Tokens.blood,
+        color: YLV2_Tokens.cream, padding: 'calc(env(safe-area-inset-top) + 28px) 22px calc(env(safe-area-inset-bottom) + 28px)',
         direction: L.dir, display: 'flex', flexDirection: 'column', zIndex: 70,
+        overflowY: 'auto',
       }}>
         <button onClick={close} style={{
           width: 40, height: 40, borderRadius: 20, border: 'none',
@@ -787,9 +774,10 @@ function V2SOS({ t, L, close }) {
 
   return (
     <div style={{
-      position: 'absolute', inset: 0, background: YLV2_Tokens.blood,
-      color: YLV2_Tokens.cream, padding: '56px 22px 40px',
+      position: 'fixed', inset: 0, background: YLV2_Tokens.blood,
+      color: YLV2_Tokens.cream, padding: 'calc(env(safe-area-inset-top) + 28px) 22px calc(env(safe-area-inset-bottom) + 28px)',
       direction: L.dir, display: 'flex', flexDirection: 'column', zIndex: 70,
+      overflowY: 'auto',
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <button onClick={close} style={{
@@ -826,7 +814,7 @@ function V2SOS({ t, L, close }) {
 function V2ModePicker({ t, L, active, setActive, onClose }) {
   const rtl = L.dir === 'rtl';
   return (
-    <div style={{ position: 'absolute', inset: 0, background: YLV2_Tokens.ink, zIndex: 60, padding: '56px 22px 40px', direction: L.dir, overflowY: 'auto' }}>
+    <div style={{ position: 'fixed', inset: 0, background: YLV2_Tokens.ink, zIndex: 60, padding: 'calc(env(safe-area-inset-top) + 28px) 22px calc(env(safe-area-inset-bottom) + 28px)', direction: L.dir, overflowY: 'auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <button onClick={onClose} style={{
           width: 38, height: 38, borderRadius: 19, border: `1px solid ${YLV2_Tokens.creamHair}`,
@@ -1028,8 +1016,8 @@ function V2Notifications({ t, L, close }) {
   const items = t.notifs.filter(n => n.t === tab && !cleared[n.title]);
   const colorFor = (c) => ({ amber: YLV2_Tokens.amber, blood: YLV2_Tokens.blood, sage: YLV2_Tokens.sage, gold: YLV2_Tokens.gold, ghost: YLV2_Tokens.creamMute }[c] || YLV2_Tokens.amber);
   return (
-    <div style={{ position: 'absolute', inset: 0, background: YLV2_Tokens.ink, zIndex: 55, direction: L.dir, overflowY: 'auto' }}>
-      <div style={{ padding: '56px 22px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <div style={{ position: 'fixed', inset: 0, background: YLV2_Tokens.ink, zIndex: 55, direction: L.dir, overflowY: 'auto' }}>
+      <div style={{ padding: 'calc(env(safe-area-inset-top) + 18px) 22px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <button onClick={close} style={{
           width: 38, height: 38, borderRadius: 19, border: `1px solid ${YLV2_Tokens.creamHair}`,
           background: YLV2_Tokens.inkSoft, color: YLV2_Tokens.cream, cursor: 'pointer',
@@ -1110,7 +1098,7 @@ function V2Notifications({ t, L, close }) {
 function V2Food({ t, L, go }) {
   const rtl = L.dir === 'rtl';
   return (
-    <div style={{ padding: '56px 0 150px', direction: L.dir, color: YLV2_Tokens.cream }}>
+    <div style={{ padding: 'calc(env(safe-area-inset-top) + 64px) 0 calc(env(safe-area-inset-bottom) + 120px)', direction: L.dir, color: YLV2_Tokens.cream }}>
       <div style={{ padding: '0 22px 14px' }}>
         <div style={{ fontFamily: YLV2_Type.mono, fontSize: 10.5, color: YLV2_Tokens.creamMute, letterSpacing: 1.5, textTransform: 'uppercase' }}>
           {rtl ? 'מסלול · חלבון גבוה' : 'Path · High protein'}
@@ -1209,7 +1197,7 @@ function V2Food({ t, L, go }) {
 function V2Train({ t, L }) {
   const rtl = L.dir === 'rtl';
   return (
-    <div style={{ padding: '56px 0 150px', direction: L.dir, color: YLV2_Tokens.cream }}>
+    <div style={{ padding: 'calc(env(safe-area-inset-top) + 64px) 0 calc(env(safe-area-inset-bottom) + 120px)', direction: L.dir, color: YLV2_Tokens.cream }}>
       <div style={{ padding: '0 22px 14px' }}>
         <div style={{ fontFamily: YLV2_Type.mono, fontSize: 10.5, color: YLV2_Tokens.creamMute, letterSpacing: 1.5, textTransform: 'uppercase' }}>
           {t.lowEnergy}
@@ -1286,7 +1274,7 @@ function V2Progress({ t, L }) {
   ];
 
   return (
-    <div style={{ padding: '56px 0 150px', direction: L.dir, color: YLV2_Tokens.cream }}>
+    <div style={{ padding: 'calc(env(safe-area-inset-top) + 64px) 0 calc(env(safe-area-inset-bottom) + 120px)', direction: L.dir, color: YLV2_Tokens.cream }}>
       <div style={{ padding: '0 22px 14px' }}>
         <div style={{ fontFamily: YLV2_Type.mono, fontSize: 10.5, color: YLV2_Tokens.creamMute, letterSpacing: 1.5, textTransform: 'uppercase' }}>
           23 / 168 {rtl ? 'ימים' : 'days'}
@@ -1336,7 +1324,7 @@ function V2AI({ t, L }) {
   ]);
 
   return (
-    <div style={{ padding: '56px 0 150px', direction: L.dir, color: YLV2_Tokens.cream, position: 'relative', minHeight: '100%' }}>
+    <div style={{ padding: 'calc(env(safe-area-inset-top) + 64px) 0 calc(env(safe-area-inset-bottom) + 120px)', direction: L.dir, color: YLV2_Tokens.cream, position: 'relative', minHeight: '100%' }}>
       <div style={{ padding: '0 22px 14px' }}>
         <div style={{ fontFamily: YLV2_Type.mono, fontSize: 10.5, color: YLV2_Tokens.amber, letterSpacing: 1.5, textTransform: 'uppercase' }}>
           {rtl ? 'יואב · הזיכרון שלי עליך' : 'Yoav · my memory of you'}
@@ -1388,7 +1376,7 @@ function V2AI({ t, L }) {
         ))}
       </div>
 
-      <div style={{ position: 'absolute', left: 16, right: 16, bottom: 104, direction: L.dir }}>
+      <div style={{ position: 'fixed', left: 16, right: 16, bottom: 'calc(env(safe-area-inset-bottom) + 104px)', direction: L.dir, maxWidth: 448, marginLeft: 'auto', marginRight: 'auto' }}>
         <div style={{
           background: YLV2_Tokens.inkSoft, borderRadius: 999,
           border: `1px solid ${YLV2_Tokens.creamHair}`,
@@ -1428,17 +1416,24 @@ function V2TabBar({ tab, setTab, t, L }) {
   ];
   return (
     <div style={{
-      position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 40,
-      padding: '8px 10px 28px', direction: L.dir,
-      background: 'linear-gradient(to top, #061414 70%, rgba(6,20,20,0))',
+      position: 'fixed',
+      bottom: 'calc(env(safe-area-inset-bottom) + 14px)',
+      left: 12, right: 12,
+      zIndex: 45,
+      direction: L.dir,
       pointerEvents: 'none',
+      maxWidth: 456, marginLeft: 'auto', marginRight: 'auto',
     }}>
       <div style={{
         pointerEvents: 'auto',
-        background: YLV2_Tokens.inkElev, borderRadius: 28,
+        background: 'rgba(17,38,38,0.82)',
+        backdropFilter: 'blur(22px) saturate(180%)',
+        WebkitBackdropFilter: 'blur(22px) saturate(180%)',
+        borderRadius: 28,
         padding: '10px 6px',
         display: 'flex', justifyContent: 'space-between',
-        border: `1px solid ${YLV2_Tokens.creamHair}`,
+        border: `1px solid rgba(233,235,230,0.14)`,
+        boxShadow: '0 10px 30px rgba(0,0,0,0.5), 0 0 0 0.5px rgba(188,255,0,0.06), inset 0 1px 0 rgba(255,255,255,0.04)',
       }}>
         {items.map(it => {
           const active = tab === it.k;
@@ -1446,16 +1441,198 @@ function V2TabBar({ tab, setTab, t, L }) {
             <button key={it.k} onClick={() => setTab(it.k)} style={{
               flex: 1, border: 'none', background: active ? YLV2_Tokens.amber : 'transparent',
               color: active ? YLV2_Tokens.ink : YLV2_Tokens.creamDim,
-              borderRadius: 20, padding: '7px 4px', cursor: 'pointer',
+              borderRadius: 20, padding: '8px 4px', cursor: 'pointer',
               display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
               fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans,
-              fontSize: 10, fontWeight: 600,
+              fontSize: 10.5, fontWeight: 600,
+              transition: 'background 0.15s, color 0.15s',
             }}>
               <V2Icon name={it.icon} size={20}/>
               <span>{it.label}</span>
             </button>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────
+   Settings screen
+   ────────────────────────────────────────────────────────────── */
+function SettingsSection({ label, icon, children }) {
+  return (
+    <div style={{ marginBottom: 22 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, padding: '0 6px' }}>
+        <V2Icon name={icon} size={14} color={YLV2_Tokens.amber}/>
+        <span style={{ fontFamily: YLV2_Type.mono, fontSize: 10, color: YLV2_Tokens.amber, letterSpacing: 1.2, textTransform: 'uppercase', fontWeight: 600 }}>
+          {label}
+        </span>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>{children}</div>
+    </div>
+  );
+}
+
+function SettingsToggle({ label, sub, defaultOn = false }) {
+  const [on, setOn] = React.useState(defaultOn);
+  return (
+    <div style={{
+      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+      padding: '14px 16px', borderRadius: 14,
+      background: YLV2_Tokens.inkSoft,
+      border: `1px solid ${YLV2_Tokens.creamHair}`,
+    }}>
+      <div style={{ flex: 1 }}>
+        <div style={{ color: YLV2_Tokens.cream, fontSize: 14, fontWeight: 500 }}>{label}</div>
+        {sub && <div style={{ color: YLV2_Tokens.creamMute, fontSize: 11, marginTop: 2 }}>{sub}</div>}
+      </div>
+      <button onClick={() => setOn(!on)} style={{
+        width: 46, height: 26, borderRadius: 13,
+        background: on ? YLV2_Tokens.amber : 'rgba(233,235,230,0.14)',
+        border: 'none', cursor: 'pointer', position: 'relative', flexShrink: 0,
+        transition: 'background 0.2s',
+      }}>
+        <div style={{
+          position: 'absolute', top: 3, left: on ? 23 : 3,
+          width: 20, height: 20, borderRadius: 10,
+          background: on ? YLV2_Tokens.ink : YLV2_Tokens.cream,
+          transition: 'left 0.2s',
+        }}/>
+      </button>
+    </div>
+  );
+}
+
+function SettingsRow({ label, value, danger, onClick }) {
+  return (
+    <button onClick={onClick} style={{
+      display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12,
+      padding: '14px 16px', borderRadius: 14, width: '100%',
+      background: YLV2_Tokens.inkSoft,
+      border: `1px solid ${danger ? 'rgba(229,107,90,0.3)' : YLV2_Tokens.creamHair}`,
+      color: danger ? YLV2_Tokens.blood : YLV2_Tokens.cream,
+      fontSize: 14, fontWeight: 500, cursor: 'pointer', textAlign: 'inherit',
+      fontFamily: 'inherit',
+    }}>
+      <span>{label}</span>
+      {value && <span style={{ color: YLV2_Tokens.creamMute, fontFamily: YLV2_Type.mono, fontSize: 11 }}>{value}</span>}
+    </button>
+  );
+}
+
+function V2Settings({ t, L, lang, setLang, mode, setMode, close }) {
+  const rtl = L.dir === 'rtl';
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: YLV2_Tokens.ink, zIndex: 65,
+      direction: L.dir, overflowY: 'auto',
+    }}>
+      <div style={{
+        padding: 'calc(env(safe-area-inset-top) + 14px) 22px 10px',
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+      }}>
+        <button onClick={close} style={{
+          width: 38, height: 38, borderRadius: 19,
+          border: `1px solid ${YLV2_Tokens.creamHair}`,
+          background: YLV2_Tokens.inkSoft, color: YLV2_Tokens.cream, cursor: 'pointer',
+          display: 'grid', placeItems: 'center',
+        }}><V2Icon name="x" size={16}/></button>
+        <span style={{ fontFamily: YLV2_Type.mono, fontSize: 10, color: YLV2_Tokens.creamMute, letterSpacing: 2, textTransform: 'uppercase' }}>
+          {rtl ? 'הגדרות' : 'Settings'}
+        </span>
+        <div style={{ width: 38 }}/>
+      </div>
+
+      <div style={{ padding: '0 22px 8px' }}>
+        <div style={{ fontFamily: rtl ? YLV2_Type.heb : YLV2_Type.serif, fontSize: 32, color: YLV2_Tokens.cream, letterSpacing: -0.5, lineHeight: 1.05 }}>
+          {rtl ? <>הגדרות.<br/><em style={{color: YLV2_Tokens.amber}}>שלך.</em></> : <>Settings.<br/><em style={{color: YLV2_Tokens.amber}}>Yours.</em></>}
+        </div>
+        <div style={{ fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 13, color: YLV2_Tokens.creamDim, marginTop: 8 }}>
+          {rtl ? 'שולט בכל. בלי פשרות.' : 'Full control. Zero compromise.'}
+        </div>
+      </div>
+
+      <div style={{ padding: '20px 16px calc(env(safe-area-inset-bottom) + 140px)' }}>
+
+        <SettingsSection label={rtl ? 'שפה' : 'Language'} icon="globe">
+          <div style={{ display: 'flex', gap: 8 }}>
+            {[['he', 'עברית'], ['en', 'English']].map(([k, l]) => (
+              <button key={k} onClick={() => setLang(k)} style={{
+                flex: 1, padding: '14px', borderRadius: 14,
+                border: `1px solid ${lang === k ? YLV2_Tokens.amber : YLV2_Tokens.creamHair}`,
+                background: lang === k ? YLV2_Tokens.amber : YLV2_Tokens.inkSoft,
+                color: lang === k ? YLV2_Tokens.ink : YLV2_Tokens.cream,
+                fontFamily: YLV2_Type.sans, fontSize: 14, fontWeight: 600, cursor: 'pointer',
+              }}>{l}</button>
+            ))}
+          </div>
+        </SettingsSection>
+
+        <SettingsSection label={rtl ? 'פרופיל' : 'Profile'} icon="user">
+          <SettingsRow label={rtl ? 'שם' : 'Name'} value="Yoav"/>
+          <SettingsRow label={rtl ? 'משקל נוכחי' : 'Current weight'} value="93.2 kg"/>
+          <SettingsRow label={rtl ? 'יעד' : 'Target'} value="80 kg"/>
+        </SettingsSection>
+
+        <SettingsSection label={rtl ? 'מצב ברירת מחדל' : 'Default day mode'} icon="clock">
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {t.modes.map(m => (
+              <button key={m.k} onClick={() => setMode(m.k)} style={{
+                padding: '9px 13px', borderRadius: 999,
+                border: `1px solid ${mode === m.k ? YLV2_Tokens.amber : YLV2_Tokens.creamHair}`,
+                background: mode === m.k ? 'rgba(188,255,0,0.14)' : YLV2_Tokens.inkSoft,
+                color: mode === m.k ? YLV2_Tokens.amber : YLV2_Tokens.creamDim,
+                fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 12, fontWeight: 500,
+                cursor: 'pointer',
+              }}>{m.label}</button>
+            ))}
+          </div>
+        </SettingsSection>
+
+        <SettingsSection label={rtl ? 'התראות' : 'Notifications'} icon="bell">
+          <SettingsToggle label={rtl ? 'התראות חכמות' : 'Smart notifications'} sub={rtl ? 'רק מה שחשוב' : 'only what matters'} defaultOn/>
+          <SettingsToggle label={rtl ? 'רגעים רגישים' : 'Sensitive moments'} sub={rtl ? 'לפני הנקודות שאתה נשבר בהן' : 'before your known trigger windows'} defaultOn/>
+          <SettingsToggle label={rtl ? 'רטט' : 'Haptics'} defaultOn/>
+          <SettingsToggle label={rtl ? 'שקט 22:00–07:00' : 'Quiet 22:00–07:00'} defaultOn/>
+        </SettingsSection>
+
+        <SettingsSection label={rtl ? 'תזכורות' : 'Reminders'} icon="clock">
+          <SettingsToggle label={rtl ? 'מים — כוס לפני כל ארוחה' : 'Water before each meal'} defaultOn/>
+          <SettingsToggle label={rtl ? 'צ׳ק-אין בוקר' : 'Morning check-in'} sub="07:00" defaultOn/>
+          <SettingsToggle label={rtl ? 'הליכה צהריים' : 'Midday walk'} defaultOn={false}/>
+        </SettingsSection>
+
+        <SettingsSection label={rtl ? 'נתונים' : 'Data'} icon="shield">
+          <SettingsRow label={rtl ? 'ייצוא נתונים' : 'Export data'}/>
+          <SettingsRow label={rtl ? 'סנכרון עם Apple Health' : 'Sync with Apple Health'}/>
+          <SettingsRow label={rtl ? 'סנכרון עם Google Fit' : 'Sync with Google Fit'}/>
+          <SettingsRow label={rtl ? 'איפוס צ׳ק-אין היום' : 'Reset today\'s check-in'}/>
+          <SettingsRow label={rtl ? 'מחיקת כל הנתונים' : 'Delete all data'} danger/>
+        </SettingsSection>
+
+        <SettingsSection label={rtl ? 'על המערכת' : 'About'} icon="brain">
+          <div style={{
+            padding: '16px 18px', borderRadius: 14,
+            background: YLV2_Tokens.inkSoft, border: `1px solid ${YLV2_Tokens.creamHair}`,
+          }}>
+            <div style={{ fontFamily: rtl ? YLV2_Type.heb : YLV2_Type.serif, fontSize: 22, color: YLV2_Tokens.cream, lineHeight: 1.1 }}>
+              YOAV LIFE <em style={{ color: YLV2_Tokens.amber }}>v2</em>
+            </div>
+            <div style={{ fontFamily: YLV2_Type.mono, fontSize: 10, color: YLV2_Tokens.creamMute, letterSpacing: 0.8, marginTop: 6 }}>
+              Personal OS · Build 2.0.0
+            </div>
+            <div style={{ fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 12.5, color: YLV2_Tokens.creamDim, marginTop: 12, lineHeight: 1.5 }}>
+              {rtl
+                ? 'מערכת הפעלה אישית לגבר עצמאי. הגוף, האנרגיה, הפוקוס והעסק — מערכת אחת, לא ארבע נפרדות.'
+                : 'A private operating system for a self-employed man. Body, energy, focus and business — one system, not four separate apps.'}
+            </div>
+          </div>
+          <SettingsRow label={rtl ? 'תנאי שימוש' : 'Terms'}/>
+          <SettingsRow label={rtl ? 'פרטיות' : 'Privacy'}/>
+          <SettingsRow label={rtl ? 'צור קשר' : 'Contact'}/>
+        </SettingsSection>
+
       </div>
     </div>
   );
@@ -1472,7 +1649,13 @@ function App() {
   const [tab, setTab] = React.useState('today');
   const [mode, setMode] = React.useState('meetings');
   const [state, setState] = React.useState({ checkedIn: true });
-  const [overlay, setOverlay] = React.useState(null); // 'sos' | 'notifs' | 'modes' | null
+  const [overlay, setOverlay] = React.useState(null); // 'sos' | 'notifs' | 'modes' | 'settings' | null
+
+  // Keep <html> dir/lang in sync so RTL is honored natively by the browser
+  React.useEffect(() => {
+    document.documentElement.setAttribute('dir', L.dir);
+    document.documentElement.setAttribute('lang', lang);
+  }, [lang, L.dir]);
 
   const screen = (() => {
     switch (tab) {
@@ -1487,42 +1670,59 @@ function App() {
     }
   })();
 
+  const rtl = L.dir === 'rtl';
+
   return (
-    <IOSDevice dark width={402} height={874}>
-      <div style={{ position: 'relative', minHeight: '100%', background: YLV2_Tokens.ink, overflow: 'hidden' }}>
-        {screen}
-        <V2TabBar tab={tab} setTab={setTab} t={t} L={L}/>
-        {overlay === 'sos'    && <V2SOS t={t} L={L} close={() => setOverlay(null)}/>}
-        {overlay === 'notifs' && <V2Notifications t={t} L={L} close={() => setOverlay(null)}/>}
-        {overlay === 'modes'  && <V2ModePicker t={t} L={L} active={mode} setActive={setMode} onClose={() => setOverlay(null)}/>}
+    <div style={{
+      position: 'relative', minHeight: '100dvh',
+      background: YLV2_Tokens.ink, color: YLV2_Tokens.cream,
+      direction: L.dir, overflow: 'hidden',
+    }}>
+      {/* Floating controls pill — settings + language, always accessible */}
+      <div style={{
+        position: 'fixed', zIndex: 50,
+        top: 'calc(env(safe-area-inset-top) + 10px)',
+        [rtl ? 'left' : 'right']: 12,
+        display: 'flex', gap: 6, direction: 'ltr',
+      }}>
+        <button onClick={() => setOverlay('settings')} aria-label="Settings" style={{
+          width: 36, height: 36, borderRadius: 18,
+          background: 'rgba(17,38,38,0.72)',
+          backdropFilter: 'blur(14px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(14px) saturate(180%)',
+          border: `1px solid rgba(233,235,230,0.16)`,
+          color: YLV2_Tokens.cream, cursor: 'pointer',
+          display: 'grid', placeItems: 'center',
+        }}>
+          <V2Icon name="cog" size={16}/>
+        </button>
+        <button onClick={() => setLang(lang === 'he' ? 'en' : 'he')} aria-label="Language" style={{
+          minWidth: 40, height: 36, borderRadius: 18,
+          padding: '0 12px',
+          background: 'rgba(188,255,0,0.14)', color: YLV2_Tokens.amber,
+          backdropFilter: 'blur(14px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(14px) saturate(180%)',
+          border: `1px solid ${YLV2_Tokens.amber}`, cursor: 'pointer',
+          fontFamily: YLV2_Type.mono, fontSize: 10, fontWeight: 700, letterSpacing: 1.2,
+        }}>{lang === 'he' ? 'EN' : 'עב'}</button>
       </div>
 
-      {/* language toggle inside the frame, top-left of status bar */}
-      <button onClick={() => setLang(lang === 'he' ? 'en' : 'he')} style={{
-        position: 'absolute', top: 18, right: 24, zIndex: 30,
-        width: 44, height: 28, borderRadius: 14,
-        background: 'rgba(188,255,0,0.14)', color: YLV2_Tokens.amber,
-        border: `1px solid ${YLV2_Tokens.amber}`, cursor: 'pointer',
-        fontFamily: YLV2_Type.mono, fontSize: 10, fontWeight: 700, letterSpacing: 1.2,
-      }}>{lang === 'he' ? 'EN' : 'עב'}</button>
-    </IOSDevice>
+      {/* Active screen */}
+      {screen}
+
+      {/* Floating bottom tab bar */}
+      <V2TabBar tab={tab} setTab={setTab} t={t} L={L}/>
+
+      {/* Overlays */}
+      {overlay === 'sos'      && <V2SOS t={t} L={L} close={() => setOverlay(null)}/>}
+      {overlay === 'notifs'   && <V2Notifications t={t} L={L} close={() => setOverlay(null)}/>}
+      {overlay === 'modes'    && <V2ModePicker t={t} L={L} active={mode} setActive={setMode} onClose={() => setOverlay(null)}/>}
+      {overlay === 'settings' && <V2Settings t={t} L={L} lang={lang} setLang={setLang} mode={mode} setMode={setMode} close={() => setOverlay(null)}/>}
+    </div>
   );
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
-
-// Fit-to-viewport scaling for the phone frame
-(function fit() {
-  const wrap = document.getElementById('phone-wrap');
-  function resize() {
-    const w = window.innerWidth - 32;
-    const h = window.innerHeight - 80;
-    const s = Math.min(w / 402, h / 874, 1);
-    wrap.style.transform = `scale(${s})`;
-  }
-  resize();
-  window.addEventListener('resize', resize);
-})();
 </script>
 
 </body>
