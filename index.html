@@ -20,9 +20,23 @@
   body { min-height: 100vh; min-height: 100dvh; }
   #root { min-height: 100vh; min-height: 100dvh; }
   *, *::before, *::after { box-sizing: border-box; }
-  button { font-family: inherit; }
+  button { font-family: inherit; cursor: pointer; }
   em { font-style: italic; }
   ::-webkit-scrollbar { width: 0; height: 0; }
+
+  /* Responsive safety — prevent flex-child overflow on narrow phones */
+  input, textarea, select { min-width: 0; max-width: 100%; }
+  button { max-width: 100%; }
+  img { max-width: 100%; display: block; }
+
+  /* Make pill/chip rows scroll horizontally instead of breaking layout when they overflow */
+  .chip-row {
+    display: flex; gap: 6px; flex-wrap: wrap;
+    max-width: 100%;
+  }
+
+  /* Tab-bar labels shouldn't wrap */
+  .tab-label { white-space: nowrap; }
 
   /* Desktop: center the app with a max width to avoid ultra-wide stretched content */
   @media (min-width: 900px) {
@@ -1536,13 +1550,8 @@ function V2Food({ t, L, stats, store, openMeal, openPhotoMeal, openProductScan }
 
 function V2Train({ t, L, stats, store, openWorkout }) {
   const rtl = L.dir === 'rtl';
-  const typeLabel = (k) => {
-    const map = rtl
-      ? { walk:'הליכה', run:'ריצה', strength:'כוח', hiit:'HIIT', mobility:'ניידות', boxing:'אגרוף', swim:'שחיה', other:'אחר' }
-      : { walk:'Walk', run:'Run', strength:'Strength', hiit:'HIIT', mobility:'Mobility', boxing:'Boxing', swim:'Swim', other:'Other' };
-    return map[k] || k;
-  };
-  const typeIcon = (k) => ({ walk:'walk', run:'bolt', strength:'train', hiit:'flame', mobility:'heart', boxing:'bolt', swim:'drop', other:'clock' }[k] || 'train');
+  const typeLabel = (k) => { const v = WORKOUT_VIDEOS[k]; return v ? (rtl ? v.he : v.en) : k; };
+  const typeIcon  = (k) => (WORKOUT_VIDEOS[k] && WORKOUT_VIDEOS[k].icon) || 'train';
   return (
     <div style={{ padding: 'calc(env(safe-area-inset-top) + 64px) 0 calc(env(safe-area-inset-bottom) + 120px)', direction: L.dir, color: YLV2_Tokens.cream }}>
       <div style={{ padding: '0 22px 14px' }}>
@@ -1634,36 +1643,26 @@ function V2Train({ t, L, stats, store, openWorkout }) {
         </div>
       </div>
       <div style={{ padding: '0 16px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
-        {[
-          { k: rtl ? 'הליכה' : 'Walk',     i: 'walk',    type: 'walk' },
-          { k: rtl ? 'ריצה' : 'Run',       i: 'bolt',    type: 'run' },
-          { k: rtl ? 'כוח' : 'Strength',   i: 'train',   type: 'strength' },
-          { k: 'HIIT',                      i: 'flame',  type: 'hiit' },
-          { k: rtl ? 'ניידות' : 'Mobility',i: 'heart',   type: 'mobility' },
-          { k: rtl ? 'אגרוף' : 'Boxing',   i: 'bolt',    type: 'boxing' },
-          { k: rtl ? 'שחיה' : 'Swim',      i: 'drop',    type: 'swim' },
-          { k: rtl ? 'קצר' : 'Quick',      i: 'clock',   type: 'other' },
-          { k: rtl ? 'רגוע' : 'Recovery',  i: 'moon',    type: 'mobility' },
-        ].map((m,i) => {
-          const vid = WORKOUT_VIDEOS[m.type];
+        {WORKOUT_TYPES_ORDER.map((type) => {
+          const vid = WORKOUT_VIDEOS[type];
           return (
-            <V2Card key={i} pad={12} dark style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <V2Card key={type} pad={12} dark style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 }}>
               <button onClick={openWorkout} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'inherit', padding: 0 }}>
                 <div style={{ margin: '0 auto', width: 34, height: 34, borderRadius: 10, background: 'rgba(233,235,230,0.06)', display: 'grid', placeItems: 'center', color: YLV2_Tokens.amber }}>
-                  <V2Icon name={m.i} size={18}/>
+                  <V2Icon name={vid.icon} size={18}/>
                 </div>
-                <div style={{ fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 12, fontWeight: 500, color: YLV2_Tokens.cream, marginTop: 8 }}>{m.k}</div>
+                <div style={{ fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 12, fontWeight: 500, color: YLV2_Tokens.cream, marginTop: 8 }}>
+                  {rtl ? vid.he : vid.en}
+                </div>
               </button>
-              {vid && (
-                <a href={ytWatchSearchUrl(vid.ytq)} target="_blank" rel="noreferrer" style={{
-                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4,
-                  padding: '5px 8px', borderRadius: 999, textDecoration: 'none',
-                  background: 'rgba(188,255,0,0.1)', color: YLV2_Tokens.amber,
-                  fontFamily: YLV2_Type.mono, fontSize: 9, letterSpacing: 0.5, fontWeight: 600,
-                }} onClick={(e) => e.stopPropagation()}>
-                  <V2Icon name="play" size={9} color={YLV2_Tokens.amber}/> YT
-                </a>
-              )}
+              <a href={ytWatchSearchUrl(vid.ytq)} target="_blank" rel="noreferrer" style={{
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+                padding: '5px 8px', borderRadius: 999, textDecoration: 'none',
+                background: 'rgba(188,255,0,0.1)', color: YLV2_Tokens.amber,
+                fontFamily: YLV2_Type.mono, fontSize: 9, letterSpacing: 0.5, fontWeight: 600,
+              }} onClick={(e) => e.stopPropagation()}>
+                <V2Icon name="play" size={9} color={YLV2_Tokens.amber}/> YT
+              </a>
             </V2Card>
           );
         })}
@@ -1898,7 +1897,36 @@ function V2AI({ t, L, stats }) {
               fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 13.5,
               color: YLV2_Tokens.cream, padding: '0 8px', direction: L.dir,
             }}/>
-          <button onClick={() => { if (!draft.trim()) return; setMsgs([...msgs, { who: 'me', text: draft }]); setDraft(''); }}
+          <button onClick={async () => {
+            const text = draft.trim();
+            if (!text) return;
+            setDraft('');
+            const base = [...msgs, { who: 'me', text }];
+            setMsgs(base);
+            if (!apiKey) {
+              setMsgs([...base, { who: 'ai', text: rtl ? 'כדי שאענה באמת, הדבק מפתח Claude API ב-⚙ הגדרות → חיבור ל-AI. בינתיים אני קורא רק מה שכתבת.' : "To reply for real, paste your Claude API key in Settings → AI. Meanwhile I'm just logging what you wrote." }]);
+              return;
+            }
+            try {
+              // Build Yoav's context from user data
+              const p = store.data.profile || {};
+              const today = stats;
+              const systemContext = rtl
+                ? `אתה "יואב AI" — מערכת הפעלה אישית לגבר עצמאי בשם ${p.name || 'יואב'}. יעד ירידה מ-${p.startWeight}ק״ג ל-${p.targetWeight}ק״ג. יום ${today.dayCount} מתוך ${today.planDays}. משקל אחרון ${today.latestWeight || '—'}ק״ג. אכל היום ${today.todaysKcal} קלוריות, ${today.todaysProtein}g חלבון. שתה ${today.todaysWater} כוסות מים. מוצרים שלא אוכל: ${(store.data.dislikes||[]).join(', ') || 'אין'}. דבר ישירות, קצר, בלי נדושות. בעברית. ישיר ואכפתי כמו מאמן אמיתי שמכיר אותו.`
+                : `You are "Yoav AI" — a personal OS for a self-employed man named ${p.name || 'Yoav'}. Target ${p.startWeight}→${p.targetWeight}kg. Day ${today.dayCount}/${today.planDays}. Latest weight ${today.latestWeight || '—'}kg. Today: ${today.todaysKcal} kcal, ${today.todaysProtein}g protein, ${today.todaysWater} cups water. Dislikes: ${(store.data.dislikes||[]).join(', ') || 'none'}. Talk direct, short, no platitudes.`;
+              const history = base.slice(-8).map(m => ({ role: m.who === 'me' ? 'user' : 'assistant', content: m.text }));
+              const reply = await callClaude({
+                apiKey,
+                maxTokens: 500,
+                messages: [
+                  { role: 'user', content: systemContext + '\n\n---\n\n' + text + '\n\n(המשך השיחה בהתבסס על ההיסטוריה למעלה אם יש)' },
+                ],
+              });
+              setMsgs([...base, { who: 'ai', text: reply }]);
+            } catch (e) {
+              setMsgs([...base, { who: 'ai', text: rtl ? `שגיאה מ-Claude: ${String(e.message || e).slice(0, 140)}` : `Claude error: ${String(e.message || e).slice(0, 140)}` }]);
+            }
+          }}
             style={{
               width: 38, height: 38, borderRadius: 19, border: 'none',
               background: YLV2_Tokens.amber, color: YLV2_Tokens.ink, cursor: 'pointer',
@@ -2399,15 +2427,31 @@ const RECIPES = [
 ];
 
 const WORKOUT_VIDEOS = {
-  walk:     { ytq: 'מה הדרך הנכונה ללכת מהר',        title_he: 'הליכה מהירה נכונה',          title_en: 'Brisk walking form' },
-  run:      { ytq: 'ריצה למתחילים טכניקה נכונה',     title_he: 'ריצה — טכניקה למתחילים',     title_en: 'Running form for beginners' },
-  strength: { ytq: 'אימון כוח בבית 30 דקות',          title_he: 'אימון כוח 30 דק׳ בבית',       title_en: '30-min home strength' },
-  hiit:     { ytq: 'HIIT 20 minute workout no equipment', title_he: 'HIIT 20 דק׳ בלי ציוד',   title_en: '20-min HIIT no equipment' },
-  mobility: { ytq: 'ניידות בוקר 10 דקות',             title_he: 'ניידות 10 דק׳',                title_en: '10-min mobility' },
-  boxing:   { ytq: 'אימון אגרוף למתחילים בבית',      title_he: 'אגרוף למתחילים',               title_en: 'Shadow boxing basics' },
-  swim:     { ytq: 'סגנון חזה טכניקה',                title_he: 'שחיה — טכניקת חזה',           title_en: 'Breaststroke technique' },
-  other:    { ytq: 'אימון 20 דקות בית',               title_he: 'אימון 20 דק׳ בבית',            title_en: '20-min home workout' },
+  walk:        { ytq: 'הליכה מהירה טכניקה נכונה',          icon: 'walk',  he: 'הליכה',       en: 'Walk' },
+  run:         { ytq: 'ריצה למתחילים טכניקה נכונה',        icon: 'bolt',  he: 'ריצה',        en: 'Run' },
+  strength:    { ytq: 'אימון כוח בבית 30 דקות',             icon: 'train', he: 'כוח',         en: 'Strength' },
+  hiit:        { ytq: 'HIIT 20 minute workout no equipment',icon: 'flame', he: 'HIIT',        en: 'HIIT' },
+  mobility:    { ytq: 'ניידות בוקר 10 דקות',                icon: 'heart', he: 'ניידות',      en: 'Mobility' },
+  boxing:      { ytq: 'אימון אגרוף למתחילים בבית',         icon: 'bolt',  he: 'אגרוף',       en: 'Boxing' },
+  swim:        { ytq: 'שחיה חזה טכניקה',                    icon: 'drop',  he: 'שחיה',        en: 'Swim' },
+  bike:        { ytq: 'רכיבה על אופניים לאימון',            icon: 'bolt',  he: 'אופניים',     en: 'Cycling' },
+  spinning:    { ytq: 'אימון ספינינג בבית',                  icon: 'flame', he: 'ספינינג',     en: 'Spinning' },
+  yoga:        { ytq: 'יוגה בוקר 20 דקות',                   icon: 'heart', he: 'יוגה',        en: 'Yoga' },
+  pilates:     { ytq: 'פילאטיס בבית 20 דקות',                icon: 'heart', he: 'פילאטיס',     en: 'Pilates' },
+  rowing:      { ytq: 'חתירה טכניקה נכונה',                  icon: 'drop',  he: 'חתירה',       en: 'Rowing' },
+  basketball:  { ytq: 'אימון כדורסל אישי',                   icon: 'bolt',  he: 'כדורסל',     en: 'Basketball' },
+  football:    { ytq: 'אימון כדורגל אישי',                   icon: 'bolt',  he: 'כדורגל',     en: 'Football' },
+  tennis:      { ytq: 'טניס למתחילים',                       icon: 'bolt',  he: 'טניס',       en: 'Tennis' },
+  padel:       { ytq: 'פדל למתחילים',                        icon: 'bolt',  he: 'פדל',        en: 'Padel' },
+  stretch:     { ytq: 'מתיחות 15 דקות',                      icon: 'heart', he: 'מתיחות',    en: 'Stretch' },
+  crossfit:    { ytq: 'קרוספיט WOD בבית',                    icon: 'flame', he: 'קרוספיט',    en: 'CrossFit' },
+  calisthenics:{ ytq: 'כלאסטניקס למתחילים',                  icon: 'train', he: 'כלאסטניקס',  en: 'Calisthenics' },
+  climbing:    { ytq: 'טיפוס קיר למתחילים',                  icon: 'bolt',  he: 'טיפוס',      en: 'Climbing' },
+  dance:       { ytq: 'ריקוד אירובי בבית',                   icon: 'heart', he: 'ריקוד',      en: 'Dance' },
+  martial:     { ytq: 'אמנויות לחימה למתחילים',              icon: 'bolt',  he: 'אמנויות לחימה', en: 'Martial arts' },
+  other:       { ytq: 'אימון 20 דקות בבית',                  icon: 'clock', he: 'אחר',        en: 'Other' },
 };
+const WORKOUT_TYPES_ORDER = ['walk','run','bike','strength','hiit','mobility','yoga','pilates','boxing','swim','rowing','basketball','football','tennis','padel','stretch','crossfit','calisthenics','climbing','spinning','dance','martial','other'];
 
 function ytSearchUrl(q) { return `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`; }
 function ytWatchSearchUrl(q) { return `https://m.youtube.com/results?search_query=${encodeURIComponent(q)}`; }
@@ -2744,9 +2788,7 @@ function MealSheet({ L, onClose }) {
 function WorkoutSheet({ L, onClose }) {
   const rtl = L.dir === 'rtl';
   const store = useStore();
-  const types = rtl
-    ? [['walk','הליכה'],['run','ריצה'],['strength','כוח'],['hiit','HIIT'],['mobility','ניידות'],['boxing','אגרוף'],['swim','שחיה'],['other','אחר']]
-    : [['walk','Walk'],['run','Run'],['strength','Strength'],['hiit','HIIT'],['mobility','Mobility'],['boxing','Boxing'],['swim','Swim'],['other','Other']];
+  const types = WORKOUT_TYPES_ORDER.map(k => [k, rtl ? WORKOUT_VIDEOS[k].he : WORKOUT_VIDEOS[k].en]);
   const [type, setType] = React.useState('walk');
   const [minutes, setMinutes] = React.useState('');
   const [notes, setNotes] = React.useState('');
@@ -2818,7 +2860,7 @@ function PhotoMealSheet({ L, onClose }) {
           {rtl ? 'צריך להזין מפתח Claude API בהגדרות כדי להפעיל ניתוח תמונה.' : 'Set your Claude API key in Settings to enable photo analysis.'}
         </div>
       )}
-      <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={pickFile} style={{ display: 'none' }}/>
+      <input ref={fileRef} type="file" accept="image/*" onChange={pickFile} style={{ display: 'none' }}/>
       <button onClick={() => apiKey && fileRef.current && fileRef.current.click()} disabled={!apiKey || busy} style={{
         ...primaryBtn(rtl), width: '100%', opacity: (!apiKey || busy) ? 0.5 : 1,
       }}>
@@ -2871,7 +2913,7 @@ function ProductScanSheet({ L, onClose }) {
           {rtl ? 'צריך להזין מפתח Claude API בהגדרות.' : 'Set your Claude API key in Settings first.'}
         </div>
       )}
-      <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={pickFile} style={{ display: 'none' }}/>
+      <input ref={fileRef} type="file" accept="image/*" onChange={pickFile} style={{ display: 'none' }}/>
       <button onClick={() => apiKey && fileRef.current && fileRef.current.click()} disabled={!apiKey || busy} style={{
         ...primaryBtn(rtl), width: '100%', opacity: (!apiKey || busy) ? 0.5 : 1,
       }}>
