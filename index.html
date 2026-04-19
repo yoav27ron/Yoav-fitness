@@ -2500,12 +2500,51 @@ async function fileToBase64(file) {
   return btoa(binary);
 }
 
+function extractJSON(raw) {
+  if (!raw) return null;
+  // Strip code fences first
+  let s = raw.replace(/```(?:json)?/g, '').trim();
+  // Find first { and matching final } in the cleaned string
+  const first = s.indexOf('{');
+  const last = s.lastIndexOf('}');
+  if (first < 0 || last <= first) return null;
+  try { return JSON.parse(s.slice(first, last + 1)); } catch (e) { return null; }
+}
+
+function normalizeMealFields(obj, rawText) {
+  const pick = (keys, fallback = '') => {
+    for (const k of keys) { if (obj && obj[k] != null && obj[k] !== '') return obj[k]; }
+    return fallback;
+  };
+  const asInt = (v) => { const n = Math.round(+v); return Number.isFinite(n) ? n : 0; };
+  return {
+    name: String(pick(['name','food_name','dish','item','meal','food','title'], '')).trim(),
+    kcal: asInt(pick(['kcal','calories','kcal_total','energy_kcal','energy','cal'], 0)),
+    protein: asInt(pick(['protein','protein_g','protein_grams','protein_total','p'], 0)),
+    slot: String(pick(['slot','meal_type','meal','category'], 'lunch')).toLowerCase(),
+    notes: String(pick(['notes','note','description','explanation','detail','reasoning'], '')).trim(),
+    _raw: rawText || '',
+  };
+}
+
 async function analyzeMealPhoto(apiKey, file) {
   const b64 = await fileToBase64(file);
   const mediaType = file.type && file.type.startsWith('image/') ? file.type : 'image/jpeg';
-  const prompt = 'זהה מה זה ותן ערכים תזונתיים משוערים. החזר רק JSON בפורמט: {"name":"שם קצר בעברית","kcal":מספר,"protein":מספר,"slot":"breakfast|lunch|dinner|snack","notes":"הערה קצרה"} — בלי טקסט נוסף, בלי ```.';
+  const prompt = `אתה רואה תמונה של ארוחה. חזה הערכה תזונתית.
+
+החזר JSON בדיוק בפורמט הזה, בלי טקסט לפני או אחרי, בלי code fences:
+{"name":"שם הארוחה בעברית","kcal":620,"protein":32,"slot":"lunch","notes":"איך הערכת, אילו רכיבים זיהית, ומה שווה לציין"}
+
+דרישות:
+- name: תיאור קצר בעברית (3-8 מילים) של מה שבצלחת
+- kcal: מספר שלם של קלוריות משוער לכל המוצג בתמונה
+- protein: מספר שלם של גרמי חלבון משוער
+- slot: אחד מהם: breakfast, lunch, dinner, snack
+- notes: 1-2 משפטים — אילו רכיבים זיהית, איך חישבת, או אזהרה חשובה
+
+תן תמיד הערכה מספרית גם אם לא בטוח ב-100%. עדיף הערכה טובה מאשר אפס.`;
   const raw = await callClaude({
-    apiKey, maxTokens: 400,
+    apiKey, maxTokens: 600,
     messages: [{
       role: 'user',
       content: [
@@ -2514,16 +2553,48 @@ async function analyzeMealPhoto(apiKey, file) {
       ],
     }],
   });
-  return JSON.parse(raw.replace(/^```(?:json)?|```$/g, '').trim());
+  const obj = extractJSON(raw) || {};
+  const result = normalizeMealFields(obj, raw);
+  // If parsing gave us nothing, keep the raw text as notes so the user sees SOMETHING actionable
+  if (!result.name && !result.kcal && !result.notes) result.notes = raw;
+  return result;
+}
+
+function normalizeProductFields(obj, rawText) {
+  const pick = (keys, fallback = '') => {
+    for (const k of keys) { if (obj && obj[k] != null && obj[k] !== '') return obj[k]; }
+    return fallback;
+  };
+  const asInt = (v) => { const n = Math.round(+v); return Number.isFinite(n) ? n : 0; };
+  return {
+    name: String(pick(['name','product_name','product','title','item'], '')).trim(),
+    kcal_per_100g: asInt(pick(['kcal_per_100g','kcal_100g','calories_per_100g','kcal','calories'], 0)),
+    protein_per_100g: asInt(pick(['protein_per_100g','protein_100g','protein_g_per_100g','protein','protein_g'], 0)),
+    recommended: !!pick(['recommended','recommend','suitable','ok','fit'], false),
+    why: String(pick(['why','reason','explanation','because','notes'], '')).trim(),
+    better_alternative: String(pick(['better_alternative','alternative','swap','instead','suggestion'], '')).trim(),
+    _raw: rawText || '',
+  };
 }
 
 async function analyzeProductPhoto(apiKey, file, { dislikes = [], targetWeight } = {}) {
   const b64 = await fileToBase64(file);
   const mediaType = file.type && file.type.startsWith('image/') ? file.type : 'image/jpeg';
   const ctx = `רשימת מוצרים שאני לא אוכל: ${dislikes.join(', ') || 'אין'}. יעד: ${targetWeight ? targetWeight + ' ק״ג' : 'ירידה במשקל בריאה'}.`;
-  const prompt = `אני מראה לך תמונה של מוצר מזון (אריזה/תווית). תחזיר רק JSON: {"name":"שם המוצר","kcal_per_100g":מספר,"protein_per_100g":מספר,"recommended":true/false,"why":"הסבר קצר בעברית","better_alternative":"אם לא מומלץ — הצעה קצרה"}. ${ctx}`;
+  const prompt = `אני מראה לך תמונה של מוצר מזון (אריזה/תווית).
+
+החזר JSON בדיוק בפורמט הזה, בלי טקסט לפני או אחרי, בלי code fences:
+{"name":"שם המוצר בעברית","kcal_per_100g":250,"protein_per_100g":12,"recommended":true,"why":"הסבר קצר בעברית למה מתאים או לא","better_alternative":""}
+
+כללים:
+- תן תמיד הערכה מספרית גם אם התווית לא ברורה לגמרי
+- recommended: true אם המוצר תומך ביעד ירידה במשקל, false אם לא
+- why: משפט אחד קצר ומעשי
+- better_alternative: אם recommended=false, הצעה להחלפה. אחרת, השאר מחרוזת ריקה.
+
+${ctx}`;
   const raw = await callClaude({
-    apiKey, maxTokens: 500,
+    apiKey, maxTokens: 600,
     messages: [{
       role: 'user',
       content: [
@@ -2532,7 +2603,10 @@ async function analyzeProductPhoto(apiKey, file, { dislikes = [], targetWeight }
       ],
     }],
   });
-  return JSON.parse(raw.replace(/^```(?:json)?|```$/g, '').trim());
+  const obj = extractJSON(raw) || {};
+  const result = normalizeProductFields(obj, raw);
+  if (!result.name && !result.why && !result.kcal_per_100g) result.why = raw;
+  return result;
 }
 
 async function analyzeJournal(apiKey, text, profile) {
@@ -2867,9 +2941,19 @@ function PhotoMealSheet({ L, onClose }) {
     onClose();
   };
 
+  const update = (patch) => setParsed(p => ({ ...p, ...patch }));
+  const slotOptions = rtl
+    ? [['breakfast','בוקר'],['lunch','צהריים'],['dinner','ערב'],['snack','נשנוש']]
+    : [['breakfast','Breakfast'],['lunch','Lunch'],['dinner','Dinner'],['snack','Snack']];
+
+  const canSave = parsed && parsed.name && +parsed.kcal > 0;
   const footer = parsed ? (
-    <button onClick={save} style={{ ...primaryBtn(rtl), width: '100%' }}>
-      {rtl ? `שמור כארוחה · ${parsed.kcal} kcal` : `Save as meal · ${parsed.kcal} kcal`}
+    <button onClick={save} disabled={!canSave} style={{
+      ...primaryBtn(rtl), width: '100%', opacity: canSave ? 1 : 0.4,
+    }}>
+      {canSave
+        ? (rtl ? `שמור כארוחה · ${parsed.kcal} kcal` : `Save as meal · ${parsed.kcal} kcal`)
+        : (rtl ? 'השלם את השדות' : 'Fill in the fields')}
     </button>
   ) : null;
 
@@ -2893,10 +2977,53 @@ function PhotoMealSheet({ L, onClose }) {
       )}
       {err && <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: 'rgba(229,107,90,0.14)', color: '#F2B9AF', fontSize: 12, lineHeight: 1.4 }}>{err}</div>}
       {parsed && (
-        <div style={{ marginTop: 12, padding: 14, borderRadius: 14, background: YLV2_Tokens.inkSoft, border: `1px solid ${YLV2_Tokens.creamHair}` }}>
-          <div style={{ fontFamily: rtl ? YLV2_Type.heb : YLV2_Type.serif, fontSize: 18, color: YLV2_Tokens.cream, lineHeight: 1.25 }}>{parsed.name}</div>
-          <div style={{ fontFamily: YLV2_Type.mono, fontSize: 11, color: YLV2_Tokens.creamMute, marginTop: 4 }}>{parsed.kcal} kcal · {parsed.protein}g P · {parsed.slot}</div>
-          {parsed.notes && <div style={{ fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 12.5, color: YLV2_Tokens.creamDim, marginTop: 8, lineHeight: 1.5 }}>{parsed.notes}</div>}
+        <div style={{ marginTop: 12, padding: 14, borderRadius: 14, background: YLV2_Tokens.inkSoft, border: `1px solid ${YLV2_Tokens.creamHair}`, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ fontFamily: YLV2_Type.mono, fontSize: 10, color: YLV2_Tokens.amber, letterSpacing: 1.2, textTransform: 'uppercase', fontWeight: 600 }}>
+            {rtl ? 'ניתוח · אפשר לערוך' : 'Analysis · editable'}
+          </div>
+          <div>
+            <label style={{ display: 'block', fontFamily: YLV2_Type.mono, fontSize: 9.5, color: YLV2_Tokens.creamMute, letterSpacing: 0.5, marginBottom: 4, textTransform: 'uppercase' }}>{rtl ? 'שם' : 'Name'}</label>
+            <input value={parsed.name || ''} onChange={e => update({ name: e.target.value })}
+              placeholder={rtl ? 'למשל: חביתה עם ירקות' : 'e.g. veggie omelet'} style={inputStyle(rtl)}/>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ flex: 1 }}>
+              <label style={{ display: 'block', fontFamily: YLV2_Type.mono, fontSize: 9.5, color: YLV2_Tokens.creamMute, letterSpacing: 0.5, marginBottom: 4, textTransform: 'uppercase' }}>{rtl ? 'קלוריות' : 'kcal'}</label>
+              <input type="number" inputMode="numeric" value={parsed.kcal || ''} onChange={e => update({ kcal: +e.target.value || 0 })}
+                placeholder="0" style={inputStyle(rtl)}/>
+            </div>
+            <div style={{ flex: 1 }}>
+              <label style={{ display: 'block', fontFamily: YLV2_Type.mono, fontSize: 9.5, color: YLV2_Tokens.creamMute, letterSpacing: 0.5, marginBottom: 4, textTransform: 'uppercase' }}>{rtl ? 'חלבון (g)' : 'protein (g)'}</label>
+              <input type="number" inputMode="numeric" value={parsed.protein || ''} onChange={e => update({ protein: +e.target.value || 0 })}
+                placeholder="0" style={inputStyle(rtl)}/>
+            </div>
+          </div>
+          <div>
+            <label style={{ display: 'block', fontFamily: YLV2_Type.mono, fontSize: 9.5, color: YLV2_Tokens.creamMute, letterSpacing: 0.5, marginBottom: 6, textTransform: 'uppercase' }}>{rtl ? 'סוג ארוחה' : 'meal slot'}</label>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {slotOptions.map(([k, l]) => (
+                <button key={k} onClick={() => update({ slot: k })} style={{
+                  padding: '8px 14px', borderRadius: 999,
+                  border: `1px solid ${parsed.slot === k ? YLV2_Tokens.amber : YLV2_Tokens.creamHair}`,
+                  background: parsed.slot === k ? 'rgba(188,255,0,0.14)' : 'transparent',
+                  color: parsed.slot === k ? YLV2_Tokens.amber : YLV2_Tokens.creamDim,
+                  fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                }}>{l}</button>
+              ))}
+            </div>
+          </div>
+          {parsed.notes && (
+            <div style={{ padding: '10px 12px', borderRadius: 10, background: 'rgba(188,255,0,0.06)', border: '1px solid rgba(188,255,0,0.2)', fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 12.5, color: YLV2_Tokens.cream, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+              <div style={{ fontFamily: YLV2_Type.mono, fontSize: 9, color: YLV2_Tokens.amber, letterSpacing: 1, marginBottom: 4, textTransform: 'uppercase' }}>{rtl ? 'הערות AI' : 'AI notes'}</div>
+              {parsed.notes}
+            </div>
+          )}
+          {parsed._raw && (!parsed.name || !parsed.kcal) && (
+            <details style={{ fontFamily: YLV2_Type.mono, fontSize: 10, color: YLV2_Tokens.creamMute }}>
+              <summary style={{ cursor: 'pointer' }}>{rtl ? 'תגובת AI מלאה' : 'Full AI response'}</summary>
+              <pre style={{ whiteSpace: 'pre-wrap', marginTop: 8, padding: 10, borderRadius: 8, background: 'rgba(0,0,0,0.35)', color: YLV2_Tokens.creamDim, fontSize: 11, lineHeight: 1.5 }}>{parsed._raw}</pre>
+            </details>
+          )}
         </div>
       )}
     </Sheet>
@@ -2946,20 +3073,30 @@ function ProductScanSheet({ L, onClose }) {
       {err && <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: 'rgba(229,107,90,0.14)', color: '#F2B9AF', fontSize: 12, lineHeight: 1.4 }}>{err}</div>}
       {parsed && (
         <div style={{ marginTop: 12, padding: 14, borderRadius: 14, background: parsed.recommended ? 'rgba(188,255,0,0.08)' : 'rgba(229,107,90,0.08)', border: `1px solid ${parsed.recommended ? 'rgba(188,255,0,0.28)' : 'rgba(229,107,90,0.28)'}` }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-            <div style={{ fontFamily: rtl ? YLV2_Type.heb : YLV2_Type.serif, fontSize: 18, color: YLV2_Tokens.cream }}>{parsed.name}</div>
-            <div style={{ fontFamily: YLV2_Type.mono, fontSize: 10, fontWeight: 700, color: parsed.recommended ? YLV2_Tokens.amber : YLV2_Tokens.blood, letterSpacing: 1, textTransform: 'uppercase' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
+            <div style={{ fontFamily: rtl ? YLV2_Type.heb : YLV2_Type.serif, fontSize: 18, color: YLV2_Tokens.cream, lineHeight: 1.25, flex: 1 }}>
+              {parsed.name || (rtl ? '— ללא שם' : '— no name')}
+            </div>
+            <div style={{ fontFamily: YLV2_Type.mono, fontSize: 10, fontWeight: 700, color: parsed.recommended ? YLV2_Tokens.amber : YLV2_Tokens.blood, letterSpacing: 1, textTransform: 'uppercase', flexShrink: 0 }}>
               {parsed.recommended ? (rtl ? 'מתאים' : 'OK') : (rtl ? 'לא מתאים' : 'Skip')}
             </div>
           </div>
           <div style={{ fontFamily: YLV2_Type.mono, fontSize: 11, color: YLV2_Tokens.creamMute, marginTop: 6 }}>
-            {parsed.kcal_per_100g} kcal / 100g · {parsed.protein_per_100g}g P / 100g
+            {parsed.kcal_per_100g || 0} kcal / 100g · {parsed.protein_per_100g || 0}g P / 100g
           </div>
-          <div style={{ fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 13, color: YLV2_Tokens.cream, marginTop: 8, lineHeight: 1.4 }}>{parsed.why}</div>
+          {parsed.why && (
+            <div style={{ fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 13, color: YLV2_Tokens.cream, marginTop: 8, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{parsed.why}</div>
+          )}
           {parsed.better_alternative && !parsed.recommended && (
             <div style={{ marginTop: 8, padding: 10, borderRadius: 10, background: 'rgba(188,255,0,0.08)', border: '1px solid rgba(188,255,0,0.2)', fontFamily: rtl ? YLV2_Type.hebSans : YLV2_Type.sans, fontSize: 12, color: YLV2_Tokens.amber }}>
               {rtl ? 'במקום זה: ' : 'Instead: '}{parsed.better_alternative}
             </div>
+          )}
+          {parsed._raw && (!parsed.name || !parsed.kcal_per_100g) && (
+            <details style={{ marginTop: 10, fontFamily: YLV2_Type.mono, fontSize: 10, color: YLV2_Tokens.creamMute }}>
+              <summary style={{ cursor: 'pointer' }}>{rtl ? 'תגובת AI מלאה' : 'Full AI response'}</summary>
+              <pre style={{ whiteSpace: 'pre-wrap', marginTop: 8, padding: 10, borderRadius: 8, background: 'rgba(0,0,0,0.35)', color: YLV2_Tokens.creamDim, fontSize: 11, lineHeight: 1.5 }}>{parsed._raw}</pre>
+            </details>
           )}
         </div>
       )}
